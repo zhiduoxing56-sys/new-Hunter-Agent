@@ -75,22 +75,35 @@ def main() -> int:
         "credential_source": "kong_sqlite_child_process",
         "credential_persisted": False,
         "flash": {},
-        "pro": {},
         "timeout_probe": {},
-        "fallback_probe": {},
+        "flash_only_probe": {},
         "error_mapping": {},
     }
     client = LLMClient(config=config)
     audit["flash"] = _call(client, "deepseek-v4-flash")
 
-    client.reset_tried_models()
+    # Strict flash-only: a rate limit must NOT escalate to deepseek-v4-pro.
+    flash_only_config = LLMConfig.from_env()
+    flash_only_config.fallback_enabled = True
+    flash_only_config.max_retries = 0
+    flash_only_config.timeout = 30.0
+    flash_only_client = LLMClient(config=flash_only_config)
+    original_call = flash_only_client._call_deepseek
+
+    def force_primary_rate_limit(self, messages, model_id, *args, **kwargs):
+        if model_id == "deepseek-v4-flash":
+            raise RuntimeError("HTTP 429 forced audit rate limit")
+        return original_call(messages, model_id, *args, **kwargs)
+
+    flash_only_client._call_deepseek = types.MethodType(
+        force_primary_rate_limit, flash_only_client
+    )
     try:
-        audit["pro"] = _call(client, "deepseek-v4-pro")
-        audit["pro"]["account_available"] = True
+        _call(flash_only_client, "deepseek-v4-flash")
+        audit["flash_only_probe"] = {"ok": False, "unexpected_success": True}
     except Exception as error:
-        audit["pro"] = {
-            "ok": False,
-            "account_available": False,
+        audit["flash_only_probe"] = {
+            "ok": "deepseek-v4-pro" not in flash_only_client._tried_models,
             "error": _public_error(error),
         }
 
@@ -111,29 +124,6 @@ def main() -> int:
             "error": _public_error(error),
             "timeout_seconds": timeout_config.timeout,
         }
-
-    fallback_config = LLMConfig.from_env()
-    fallback_config.fallback_enabled = True
-    fallback_config.max_retries = 0
-    fallback_config.timeout = 30.0
-    fallback_client = LLMClient(config=fallback_config)
-    original_call = fallback_client._call_deepseek
-
-    def force_primary_rate_limit(self, messages, model_id, *args, **kwargs):
-        if model_id == "deepseek-v4-flash":
-            raise RuntimeError("HTTP 429 forced audit rate limit")
-        return original_call(messages, model_id, *args, **kwargs)
-
-    fallback_client._call_deepseek = types.MethodType(
-        force_primary_rate_limit, fallback_client
-    )
-    try:
-        fallback_result = _call(fallback_client, "deepseek-v4-flash")
-        fallback_result["primary_failure"] = "forced_rate_limit"
-        fallback_result["secondary_call_real"] = True
-        audit["fallback_probe"] = fallback_result
-    except Exception as error:
-        audit["fallback_probe"] = {"ok": False, "error": _public_error(error)}
 
     invalid = LLMConfig.from_env()
     invalid.api_keys = {"deepseek": "invalid-audit-credential"}
