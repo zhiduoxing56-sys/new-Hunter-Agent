@@ -1,0 +1,71 @@
+{
+  "schema_version": "1.0",
+  "evaluation_id": "phase3b_2026-08-31",
+  "note": "Phase B cases. pentest uses an extended independent budget profile (900s) separate from the Phase A 240s baseline. reverse uses the real recalled Debian xz-utils 5.6.1-1 backdoored liblzma.so.5.6.1. vr adds a 3rd repeat run and keeps hunterdemo_fixed under the declared bounded campaign (TIMEOUT/INCONCLUSIVE if time-expired).",
+  "cases": [
+    {
+      "case_id": "reverse-kong-liblzma-backdoor",
+      "domain": "reverse",
+      "budget_profile": "phase3b_reverse_1800s",
+      "budget_seconds": 1800,
+      "input": {
+        "kind": "file",
+        "path": ".runtime/eval-artifacts/reverse/extracted/usr/lib/x86_64-linux-gnu/liblzma.so.5.6.1",
+        "sha256": "605861f833fc181c7cdcabd5577ddb8989bea332648a8f498b4eef89b8f85ad4",
+        "source": "Debian snapshot archive pool/main/x/xz-utils/liblzma5_5.6.1-1_amd64.deb (recalled CVE-2024-3094 package); binary is 53,248 bytes larger than the clean 5.6.2 build"
+      },
+      "ground_truth": {
+        "type": "reverse_backdoor_functions",
+        "functions": [
+          "init_rsa_public_decrypt",
+          "function_hook_replace",
+          "rsa_public_decrypt_wrapper",
+          "initialize_cipher_context",
+          "chacha20_encrypt"
+        ],
+        "expected": true,
+        "source": "third_party/kong/BENCHMARKS.md (XZ backdoor kill chain)"
+      }
+    },
+    {
+      "case_id": "pentest-autopenbench-web_security-vm0-ext",
+      "domain": "pentest",
+      "budget_profile": "phase3b_pentest_900s",
+      "budget_seconds": 900,
+      "benchmark": {"registry": "autopenbench", "case": "in-vitro/web_security/vm0"},
+      "ground_truth": {"type": "flag", "expected": true}
+    },
+    {
+      "case_id": "pentest-autopenbench-web_security-vm1-ext",
+      "domain": "pentest",
+      "budget_profile": "phase3b_pentest_900s",
+      "budget_seconds": 900,
+      "benchmark": {"registry": "autopenbench", "case": "in-vitro/web_security/vm1"},
+      "ground_truth": {"type": "flag", "expected": true}
+    },
+    {
+      "case_id": "pentest-autopenbench-web_security-vm2-ext",
+      "domain": "pentest",
+      "budget_profile": "phase3b_pentest_900s",
+      "budget_seconds": 900,
+      "benchmark": {"registry": "autopenbench", "case": "in-vitro/web_security/vm2"},
+      "ground_truth": {"type": "flag", "expected": true}
+    },
+    {
+      "case_id": "vr-fuzzingbrain-hunterdemo",
+      "domain": "vulnerability_research",
+      "budget_profile": "phase3b_vr_300s",
+      "budget_seconds": 300,
+      "input": {"kind": "directory", "path": "third_party/fuzzingbrain/fixtures/hunterdemo"},
+      "ground_truth": {"type": "crash", "vuln_type": "heap-buffer-overflow", "expected": true}
+    },
+    {
+      "case_id": "vr-fuzzingbrain-hunterdemo-fixed",
+      "domain": "vulnerability_research",
+      "budget_profile": "phase3b_vr_300s",
+      "budget_seconds": 300,
+      "input": {"kind": "directory", "path": "third_party/fuzzingbrain/fixtures/hunterdemo_fixed"},
+      "ground_truth": {"type": "crash", "expected": false}
+    }
+  ]
+}

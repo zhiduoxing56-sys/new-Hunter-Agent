@@ -226,6 +226,35 @@ async def main() -> int:
         report["artifacts"] = world.get("artifacts")
         report["terminal_decision"] = result.raw_output.get("terminal_decision")
         report["child_summaries"] = _child_summaries(RUNS_ROOT, run_id)
+        # Standardized Phase 3B record (artifact lineage / handoff / completion).
+        record = {
+            "case_id": "cross-domain-trudi-kong",
+            "run_id": run_id,
+            "evaluation_id": "phase3b_2026-08-31",
+            "domain_sequence": [h["capability_id"] for h in (report.get("dispatch") or [])],
+            "hunter_top_level": report.get("top_level_status"),
+            "orchestration_status": report.get("orchestration_status"),
+            "trudi_artifacts": [
+                {
+                    "id": a["artifact_id"],
+                    "type": a["artifact_type"],
+                    "sha256": a["sha256"],
+                    "path": a["path"],
+                }
+                for a in (report.get("artifacts") or [])
+            ],
+            "handoff_input_refs": [
+                d.get("input_refs")
+                for d in (report.get("raw_model_decisions") or [])
+                if d.get("capability_id") == "reverse"
+            ],
+            "evidence_sources": sorted({e["source"] for e in (report.get("evidence") or [])}),
+            "child_summaries": report["child_summaries"],
+        }
+        phase3b_root = ROOT / "evaluation" / "phase3b_results"
+        phase3b_root.mkdir(parents=True, exist_ok=True)
+        with (phase3b_root / "cross-domain.jsonl").open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record, ensure_ascii=False, default=str) + "\n")
         return 0
     finally:
         report["finished_at"] = datetime.now(UTC).isoformat()

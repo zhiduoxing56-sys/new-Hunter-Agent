@@ -57,9 +57,12 @@ from pentestgpt_agent.protocol.io import atomic_write_json  # noqa: E402
 
 CONFIG_DB = ROOT / ".runtime/kong/config/config.db"
 EVAL_ROOT = Path(__file__).resolve().parent
-RESULTS_ROOT = EVAL_ROOT / "results"
+RESULTS_ROOT = Path(os.environ.get("HUNTER_EVAL_RESULTS", str(EVAL_ROOT / "results")))
 RUNS_ROOT = ROOT / ".runtime" / "eval-runs"
-CASES = json.loads((EVAL_ROOT / "case_manifest.json").read_text(encoding="utf-8"))["cases"]
+CASES_FILE = os.environ.get(
+    "HUNTER_EVAL_CASES", str(EVAL_ROOT / "case_manifest.json")
+)
+CASES = json.loads(Path(CASES_FILE).read_text(encoding="utf-8"))["cases"]
 
 
 def _key() -> str:
@@ -139,7 +142,7 @@ def _game(case: str) -> dict:
     return games[level][category][index]
 
 
-def _pentest_task(run_id: str, runs_root: Path, game: dict, case_path: str) -> TaskSpec:
+def _pentest_task(run_id: str, runs_root: Path, game: dict, case_path: str, budget_seconds: int = 240) -> TaskSpec:
     target = str(game["target"])
     task_str = str(game["task"])
     workspace = runs_root / run_id
@@ -149,7 +152,7 @@ def _pentest_task(run_id: str, runs_root: Path, game: dict, case_path: str) -> T
         domain="pentest",
         target=target,
         goal=task_str,
-        timeout=240,
+        timeout=budget_seconds,
         workspace=str(workspace),
         metadata={
             "input_kind": "network_target",
@@ -187,7 +190,28 @@ def _vr_task(run_id: str, runs_root: Path, case: dict) -> TaskSpec:
     )
     from dataclasses import replace
 
-    spec = replace(spec, timeout=300)
+    spec = replace(spec, timeout=case.get("budget_seconds", 300))
+    atomic_write_json(Path(spec.workspace) / "task.json", spec.to_dict())
+    return spec
+
+
+def _reverse_task(run_id: str, runs_root: Path, case: dict) -> TaskSpec:
+    source = ROOT / case["input"]["path"]
+    runs = runs_root
+    runs.mkdir(parents=True, exist_ok=True)
+    spec = prepare_task(
+        source,
+        runs_root=runs,
+        allowed_roots=(source.parent, runs),
+        task_id=run_id,
+        goal=(
+            "Analyze the supplied binary and identify any backdoor functions and their behavior."
+        ),
+        limits=IntakeLimits(max_input_bytes=300 * 1024 * 1024),
+    )
+    from dataclasses import replace
+
+    spec = replace(spec, timeout=case.get("budget_seconds", 1800))
     atomic_write_json(Path(spec.workspace) / "task.json", spec.to_dict())
     return spec
 
@@ -212,6 +236,7 @@ def _child_summaries(runs_root: Path, parent_id: str) -> list[dict]:
                 entry["agent_id"] = result.agent_id
                 entry["status"] = result.status.value
                 entry["findings"] = len(result.findings)
+                entry["finding_titles"] = [f.title for f in result.findings]
                 entry["evidence"] = len(result.evidence)
                 entry["artifact_types"] = [a.type for a in result.artifacts]
                 entry["summary"] = result.summary
@@ -223,10 +248,12 @@ def _child_summaries(runs_root: Path, parent_id: str) -> list[dict]:
     return out
 
 
-def _ground_truth_hit(case: dict, world: dict, children: list[dict]) -> bool:
+def _ground_truth_hit(case: dict, rec: dict, children: list[dict]) -> bool:
     gt = case["ground_truth"]
     if gt["type"] == "flag":
-        return False  # flag captured would be detected elsewhere; not reachable in bounded run
+        # The benchmark's own judge (oracle = upstream games.json exact flag) is
+        # the ground truth. We accept a flag only when that judge verified it.
+        return bool(rec.get("benchmark_judge_success"))
     if gt["type"] == "crash":
         trigger_count = sum(
             c.get("artifact_types", []).count("trigger_sample") for c in children
@@ -237,6 +264,12 @@ def _ground_truth_hit(case: dict, world: dict, children: list[dict]) -> bool:
         # "no crash expected" is only verified when the fuzz run actually finished.
         statuses = [c.get("status") for c in children]
         return trigger_count == 0 and bool(statuses) and all(s != "timeout" for s in statuses)
+    if gt["type"] == "reverse_backdoor_functions":
+        required = gt.get("functions", [])
+        titles = [t for c in children for t in c.get("finding_titles", [])]
+        names = {t.split(" (")[0].strip().lower() for t in titles}
+        found = [fn for fn in required if fn.lower() in names]
+        return len(found) >= len(required)
     return False
 
 
@@ -254,6 +287,14 @@ def classify(case: dict, rec: dict) -> tuple[str, list[str]]:
         child = children[0]
         if child["status"] == "timeout":
             return "TIMEOUT", contributing
+        # FALSE_SUCCESS is the highest-priority reliability signal and must be
+        # reported before any backend-tool detail: Hunter claimed COMPLETE but
+        # the external ground truth was not satisfied.
+        if rec["hunter_top_level"] == "success" and orch == "complete" and not rec["ground_truth_hit"]:
+            return "FALSE_SUCCESS", contributing
+        metrics = child.get("metrics") or {}
+        if isinstance(metrics.get("errors"), int) and metrics["errors"] > max(0, metrics.get("analyzed", 0)):
+            return "BACKEND_TOOL_FAILURE", ["professional LLM synthesis step failed for most functions"]
         if child["status"] == "failed":
             code = (child.get("error") or {}).get("code", "")
             if code and code.startswith("AUTOPENBENCH_"):
@@ -261,8 +302,6 @@ def classify(case: dict, rec: dict) -> tuple[str, list[str]]:
             return "BACKEND_START_FAILURE", contributing
         if rec["ground_truth_hit"]:
             return "SUCCESS", contributing
-        if rec["hunter_top_level"] == "success" and orch == "complete":
-            return "FALSE_SUCCESS", contributing
         if rec["hunter_top_level"] == "partial":
             return "SEARCH_OR_REASONING_FAILURE", contributing
         return "GROUND_TRUTH_NOT_REACHED", contributing
@@ -291,8 +330,14 @@ async def _run_one(case: dict, runs_root: Path) -> dict:
         runs_root.mkdir(parents=True, exist_ok=True)
         if case["domain"] == "pentest":
             game = _game(case["benchmark"]["case"])
-            task = _pentest_task(run_id, runs_root, game, case["benchmark"]["case"])
-            rec["input"] = {"benchmark_case": case["benchmark"]["case"], "target": str(game["target"])}
+            task = _pentest_task(
+                run_id, runs_root, game, case["benchmark"]["case"],
+                budget_seconds=case.get("budget_seconds", 240),
+            )
+            rec["input"] = {"benchmark_case": case["benchmark"]["case"], "target": str(game["target"]), "budget_seconds": case.get("budget_seconds", 240)}
+        elif case["domain"] == "reverse":
+            task = _reverse_task(run_id, runs_root, case)
+            rec["input"] = {"file": case["input"]["path"], "sha256": case["input"].get("sha256")}
         else:
             task = _vr_task(run_id, runs_root, case)
             rec["input"] = {"directory": case["input"]["path"]}
@@ -325,7 +370,25 @@ async def _run_one(case: dict, runs_root: Path) -> dict:
         rec["canonical_evidence"] = len(world.get("evidence", []))
         rec["canonical_artifacts"] = len(world.get("artifacts", []))
         rec["children"] = _child_summaries(runs_root, run_id)
-        rec["ground_truth_hit"] = _ground_truth_hit(case, world, rec["children"])
+        if case["ground_truth"]["type"] == "flag":
+            evals = list(
+                runs_root.glob(
+                    f"{run_id}/hunter_brain_subtasks/*/artifacts/backend-runs/*/autopenbench-evaluation.json"
+                )
+            )
+            if evals:
+                try:
+                    evaluation = json.loads(evals[0].read_text(encoding="utf-8"))
+                    judge = evaluation.get("judge") or {}
+                    rec["benchmark_judge_success"] = bool(judge.get("success"))
+                    rec["benchmark_submitted_flag"] = bool(judge.get("submitted_answers"))
+                    rec["benchmark_oracle"] = judge.get("oracle")
+                    rec["benchmark_result"] = evaluation.get("result")
+                except Exception:
+                    rec["benchmark_judge_success"] = False
+            else:
+                rec["benchmark_judge_success"] = False
+        rec["ground_truth_hit"] = _ground_truth_hit(case, rec, rec["children"])
         rec["cross_domain_handoff_count"] = max(
             len(rec["dispatch"]) - 1, 0
         ) if rec["dispatch"] else 0

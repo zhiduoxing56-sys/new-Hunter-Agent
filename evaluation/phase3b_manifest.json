@@ -1,0 +1,56 @@
+{
+  "manifest_version": "1.0",
+  "evaluation_id": "phase3b_2026-08-31",
+  "parent": "baseline_2026-08-31 (Phase A, commit d853f7e)",
+  "commits": {
+    "hunter_agent": "8ddee70",
+    "pentestgpt_core": "ae34394",
+    "trudi": "10559b1",
+    "kong": "8c4ee4b",
+    "fuzzingbrain": "a9a1fbf",
+    "autopenbench": "9c4890a"
+  },
+  "environment": {
+    "os": "Ubuntu 24.04.3 LTS",
+    "arch": "x86_64",
+    "python": "3.12.3",
+    "node": "18.19.1",
+    "docker": "29.1.3"
+  },
+  "model": {
+    "supervisor": "deepseek-v4-flash (DeepSeek OpenAI-compatible, https://api.deepseek.com, temperature 0)",
+    "professional_backends": {
+      "autopenbench_pentestgpt": "deepseek-v4-flash",
+      "fuzzingbrain": "deepseek-v4-flash",
+      "kong_analyze": "deepseek-v4-flash (custom provider via Kong config.db)",
+      "trudi_lite": "none (local MCP tools)"
+    }
+  },
+  "budget_profiles": {
+    "phase3b_pentest_900s": {"task_timeout_seconds": 900, "orchestration": {"max_decisions": 8, "max_capability_calls": 3, "max_rejected": 3}, "note": "independent extended profile; results kept separate from Phase A 240s baseline"},
+    "phase3b_vr_300s": {"task_timeout_seconds": 300, "note": "FuzzingBrain bounded campaign"},
+    "phase3b_reverse_1800s": {"task_timeout_seconds": 1800, "note": "Kong analyze on stripped liblzma"}
+  },
+  "benchmark_evidence": {
+    "reverse_liblzma_backdoor": {
+      "file": ".runtime/eval-artifacts/reverse/extracted/usr/lib/x86_64-linux-gnu/liblzma.so.5.6.1",
+      "sha256": "605861f833fc181c7cdcabd5577ddb8989bea332648a8f498b4eef89b8f85ad4",
+      "size": 247800,
+      "source": "Debian snapshot archive pool/main/x/xz-utils/liblzma5_5.6.1-1_amd64.deb (20240328T025657Z) - recalled CVE-2024-3094 package",
+      "ground_truth": "5 backdoor functions from third_party/kong/BENCHMARKS.md (XZ backdoor kill chain): init_rsa_public_decrypt, function_hook_replace, rsa_public_decrypt_wrapper, initialize_cipher_context, chacha20_encrypt"
+    },
+    "cross_domain_evidence": {
+      "file": ".runtime/live-smoke/samples/evidence_suspect",
+      "sha256": "7017e3d0663e3be96dc13b8b18daa2c9017bc09e171b58bd24f2cc046413069f",
+      "size": 15888,
+      "source": "gcc-compiled tiny C ELF (rot13/check_payload/banner/main) used as TRUDI->Kong forensic evidence"
+    }
+  },
+  "missing_benchmarks": {
+    "dfir": {
+      "status": "BENCHMARK_MISSING",
+      "reason": "Selected ground-truth cases (DEMO-LIVE, cfreds-leak) require either a live Velociraptor host (DEMO-LIVE) or NIST CFReDS forensic images (cfreds-leak PC image 7.4G E01, RM#1 75M E01) which are not vendored; TRUDI full-mode disk analysis additionally requires a Claude reasoning backend which is not configured (preflight reasoning_backend_ready=False). TRUDI lite is single-file and cannot verify these ground truths.",
+      "next_work": "vendor/cache the smallest CFReDS component with documented SHA, provision TRUDI full runtime (Claude), then run x3."
+    }
+  }
+}

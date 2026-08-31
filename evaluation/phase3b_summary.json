@@ -1,0 +1,114 @@
+{
+  "evaluation_id": "phase3b_2026-08-31",
+  "total_runs": 12,
+  "routing_accuracy": {
+    "correct": 12,
+    "total": 12,
+    "rate": 100.0
+  },
+  "verified_task_success_rate": {
+    "count": 4,
+    "total": 12,
+    "rate": 33.3
+  },
+  "false_success_rate": {
+    "count": 3,
+    "total": 12,
+    "rate": 25.0
+  },
+  "per_domain_success_rate": {
+    "pentest": {
+      "runs": 3,
+      "success": 1,
+      "false_success": 1,
+      "rate": 33.3
+    },
+    "vulnerability_research": {
+      "runs": 6,
+      "success": 3,
+      "false_success": 0,
+      "rate": 50.0
+    },
+    "reverse": {
+      "runs": 3,
+      "success": 0,
+      "false_success": 2,
+      "rate": 0.0
+    },
+    "dfir": {
+      "runs": 0,
+      "success": 0,
+      "false_success": 0,
+      "rate": null
+    }
+  },
+  "primary_failure_taxonomy": {
+    "SUCCESS": 4,
+    "TIMEOUT": 3,
+    "FALSE_SUCCESS": 3,
+    "GROUND_TRUTH_NOT_REACHED": 1,
+    "BACKEND_TOOL_FAILURE": 1
+  },
+  "completion_latency_seconds": {
+    "mean": 462.7,
+    "p50": 345.1,
+    "p95": 1030.6
+  },
+  "time_to_first_useful_evidence_seconds": "not precisely instrumented; evidence-producing runs' first child success wall time ranged ~168-318s",
+  "model_request_count": {
+    "supervisor_decisions": 45,
+    "supervisor_tokens": {
+      "prompt": 103971,
+      "completion": 112337
+    },
+    "pentest_backend_model_requests": [
+      58,
+      46,
+      10
+    ],
+    "reverse_kong_llm_calls_per_run": [
+      2,
+      0,
+      0,
+      2,
+      0,
+      0,
+      2,
+      0,
+      0
+    ]
+  },
+  "tool_call_count": {
+    "pentest_backend_tool_events": [
+      57,
+      47,
+      13
+    ],
+    "reverse_kong_llm_calls_total": 6
+  },
+  "supervisor_contract_rejection": {
+    "runs_with_model_error_or_invalid_decisions_terminal": 4,
+    "rate_of_all_runs": 33.3
+  },
+  "repeated_run_consistency": {
+    "vr-fuzzingbrain-hunterdemo": {
+      "runs": 3,
+      "primary": [
+        "SUCCESS",
+        "SUCCESS",
+        "SUCCESS"
+      ],
+      "routing_consistent": true
+    },
+    "vr-fuzzingbrain-hunterdemo-fixed": {
+      "runs": 3,
+      "primary": [
+        "TIMEOUT",
+        "TIMEOUT",
+        "TIMEOUT"
+      ],
+      "routing_consistent": true
+    }
+  },
+  "estimated_cost": "not reliably tracked; supervisor tokens recorded; professional backend cost telemetry unavailable for custom provider"
+}
