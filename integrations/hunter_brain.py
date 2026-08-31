@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from hunter_brain.capabilities import default_catalog
+from hunter_brain.invocation_bridge import PentestBenchmarkBridge
 from hunter_brain.orchestrator import (
     CapabilityAdapterRegistry,
     HunterOrchestrator,
@@ -249,6 +250,7 @@ def build_analysis_brain_executor(
             runs_root=runs_root,
             question_generator=CrossDomainQuestionGenerator(catalog),
             result_interpreter=EvidenceGroundedResultInterpreter(),
+            invocation_bridge=PentestBenchmarkBridge(),
             verifier=GlobalVerifier(),
         )
     )

@@ -37,6 +37,7 @@ from hunter_brain.orchestrator import (  # noqa: E402
     HunterOrchestrator,
     OrchestrationLimits,
 )
+from hunter_brain.invocation_bridge import PentestBenchmarkBridge  # noqa: E402
 from hunter_brain.question_generator import CrossDomainQuestionGenerator  # noqa: E402
 from hunter_brain.result_interpreter import EvidenceGroundedResultInterpreter  # noqa: E402
 from hunter_brain.supervisor import (  # noqa: E402
@@ -115,6 +116,7 @@ def _bounded_executor(runs_root: Path) -> tuple[HunterBrainTaskExecutor, Capturi
             runs_root=runs_root,
             question_generator=CrossDomainQuestionGenerator(catalog),
             result_interpreter=EvidenceGroundedResultInterpreter(),
+            invocation_bridge=PentestBenchmarkBridge(),
             verifier=GlobalVerifier(),
             limits=OrchestrationLimits(
                 max_decisions=5,
@@ -263,7 +265,7 @@ def _child_summaries(runs_root: Path, parent_id: str) -> list[dict]:
 
 
 async def _pentest_parent_task(
-    run_id: str, runs_root: Path, report: dict
+    run_id: str, runs_root: Path, report: dict, *, launch_benchmark: bool = False
 ) -> tuple[TaskSpec, dict]:
     bench = AutoPenBenchProtocolAdapter()
     game = bench.game()
@@ -300,12 +302,29 @@ async def _pentest_parent_task(
             "error": f"{type(exc).__name__}: {exc}",
         }
 
+    # In launch mode the parent goal IS the canonical benchmark task string so a
+    # supervisor objective that copies it can pass prepare(); the run is tightly
+    # bounded in wall time. Otherwise keep a paraphrase that only exercises the
+    # benchmark-case gate without launching the docker benchmark.
+    parent_goal = expected_task if launch_benchmark else (
+        "Obtain authorized proof of access for the AutoPenBench in-vitro web target."
+    )
+    benchmark_metadata = (
+        {
+            "case_id": "in-vitro/web_security/vm0",
+            "target": expected_target,
+            "task": expected_task,
+            "source": "autopenbench_games_json",
+        }
+        if launch_benchmark
+        else None
+    )
     parent = TaskSpec(
         task_id=run_id,
         domain="pentest",
         target=expected_target,
-        goal=("Obtain authorized proof of access for the AutoPenBench in-vitro web target."),
-        timeout=120,
+        goal=parent_goal,
+        timeout=240 if launch_benchmark else 120,
         workspace=str(runs_root / run_id),
         input_object=InputObject(
             "bench-input", "network_target", expected_target, source_name=expected_target
@@ -318,6 +337,8 @@ async def _pentest_parent_task(
             "semantic_input_rationale": [
                 "AutoPenBench benchmark case identifier used as the authorized target"
             ],
+            "launch_benchmark": launch_benchmark,
+            **({"benchmark": benchmark_metadata} if benchmark_metadata else {}),
         },
         success_conditions=(expected_task,),
     )
@@ -326,7 +347,7 @@ async def _pentest_parent_task(
     return parent, report
 
 
-async def _smoke(domain: str) -> int:
+async def _smoke(domain: str, *, launch_benchmark: bool = False) -> int:
     run_id = _run_id(domain)
     started = time.monotonic()
     report: dict = {"domain": domain, "run_id": run_id, "started_at": datetime.now(UTC).isoformat()}
@@ -334,7 +355,9 @@ async def _smoke(domain: str) -> int:
     runs_root.mkdir(parents=True, exist_ok=True)
     try:
         if domain == "pentest":
-            task, report = await _pentest_parent_task(run_id, runs_root, report)
+            task, report = await _pentest_parent_task(
+                run_id, runs_root, report, launch_benchmark=launch_benchmark
+            )
         else:
             if domain == "dfir":
                 sample = _dfir_sample()
@@ -397,9 +420,15 @@ def main() -> None:
         required=True,
         choices=["dfir", "vulnerability_research", "reverse", "pentest"],
     )
+    parser.add_argument(
+        "--launch-benchmark",
+        action="store_true",
+        help="pentest: parent goal is the exact benchmark task and the real docker "
+        "benchmark is launched under a bounded wall timeout",
+    )
     args = parser.parse_args()
     _ensure_env()
-    raise SystemExit(asyncio.run(_smoke(args.domain)))
+    raise SystemExit(asyncio.run(_smoke(args.domain, launch_benchmark=args.launch_benchmark)))
 
 
 if __name__ == "__main__":

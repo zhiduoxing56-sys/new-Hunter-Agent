@@ -7,7 +7,7 @@ import json
 import os
 import shutil
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Protocol
@@ -31,6 +31,7 @@ from .decisions import (
     VerifyDecision,
 )
 from .handoffs import HandoffCarrier, HandoffDescriptor
+from .invocation_bridge import InvocationBridge, InvocationContractError
 from .state import DispatchRecord, HunterWorldState, UnresolvedQuestion
 from .state_updater import (
     SemanticStateProposal,
@@ -59,6 +60,7 @@ class OrchestrationStatus(StrEnum):
     MODEL_ERROR = "model_error"
     ADAPTER_UNAVAILABLE = "adapter_unavailable"
     VERIFICATION_FAILED = "verification_failed"
+    INVOCATION_CONTRACT_FAILED = "invocation_contract_failed"
 
 
 @dataclass(frozen=True)
@@ -183,6 +185,7 @@ class HunterOrchestrator:
         question_generator: ResultInterpreter | None = None,
         verifier: GlobalVerifier | None = None,
         limits: OrchestrationLimits | None = None,
+        invocation_bridge: InvocationBridge | None = None,
     ) -> None:
         self.supervisor = supervisor
         self.adapters = adapters
@@ -192,6 +195,7 @@ class HunterOrchestrator:
         self.question_generator = question_generator
         self.verifier = verifier
         self.limits = limits or OrchestrationLimits()
+        self.invocation_bridge = invocation_bridge
 
     async def run(
         self,
@@ -349,13 +353,26 @@ class HunterOrchestrator:
                     decision,
                     f"No adapter registered for {decision.capability_id}.",
                 )
-            child_task = self._build_subtask(
-                task,
-                state,
-                decision,
-                layout,
-                ledger.capability_calls_used + 1,
-            )
+            try:
+                child_task = self._build_subtask(
+                    task,
+                    state,
+                    decision,
+                    layout,
+                    ledger.capability_calls_used + 1,
+                )
+            except InvocationContractError as exc:
+                audit.append(
+                    "invocation_contract_failed",
+                    {"capability_id": decision.capability_id, "error": str(exc)},
+                )
+                return OrchestrationResult(
+                    OrchestrationStatus.INVOCATION_CONTRACT_FAILED,
+                    state,
+                    ledger.snapshot(),
+                    decision,
+                    f"Invocation contract failed for {decision.capability_id}: {exc}",
+                )
             subtasks_root = layout.root / SUBTASKS_DIRECTORY
             result = await AdapterRunner(adapter, runs_root=subtasks_root).execute(child_task)
             child_layout = RunLayout.ensure(subtasks_root, child_task)
@@ -624,7 +641,7 @@ class HunterOrchestrator:
             workspace=str(child_root),
             metadata={"hunter_brain_parent_task_id": parent.task_id},
         )
-        return TaskSpec(
+        child = TaskSpec(
             task_id=child_id,
             domain=decision.capability_id,
             target=primary_target,
@@ -644,6 +661,32 @@ class HunterOrchestrator:
             model_budget=parent.model_budget,
             resource_limits=parent.resource_limits,
         )
+        return self._apply_invocation_bridge(parent, decision, child, primary_target)
+
+    def _apply_invocation_bridge(
+        self,
+        parent: TaskSpec,
+        decision: InvokeCapabilityDecision,
+        child: TaskSpec,
+        resolved_target: str,
+    ) -> TaskSpec:
+        """Apply the deterministic capability invocation contract to a child."""
+        if self.invocation_bridge is None:
+            return child
+        override = self.invocation_bridge.apply(
+            parent=parent,
+            decision=decision,
+            resolved_target=resolved_target,
+            supervisor_objective=decision.objective,
+        )
+        if override is None:
+            return child
+        child = replace(child, goal=override.goal)
+        hunter_brain = dict(child.metadata.get("hunter_brain", {}))
+        hunter_brain.update(override.audit)
+        metadata = dict(child.metadata)
+        metadata["hunter_brain"] = hunter_brain
+        return replace(child, metadata=metadata)
 
     @staticmethod
     def _resolve_reference(

@@ -36,6 +36,7 @@ from pentestgpt_agent.protocol import (
     TargetObject,
     TaskSpec,
 )
+from pentestgpt_agent.protocol.io import atomic_write_json
 from pentestgpt_agent.protocol.mock_adapter import MockAdapter
 
 
@@ -227,6 +228,42 @@ def _network_task(runs_root: Path) -> TaskSpec:
     )
 
 
+def _benchmark_task(
+    runs_root: Path,
+    *,
+    task_id: str = "web-pentest-benchmark",
+    canonical_task: str = "Discover the target and obtain the flag.",
+) -> TaskSpec:
+    """A pentest task carrying a validated benchmark contract (deterministic)."""
+    target = "in-vitro_web_security_vm0"
+    workspace = runs_root / task_id
+    workspace.mkdir(parents=True, exist_ok=True)
+    task = TaskSpec(
+        task_id=task_id,
+        domain="pentest",
+        target=target,
+        goal=canonical_task,
+        workspace=str(workspace),
+        metadata={
+            "input_kind": "network_target",
+            "semantic_input_type": "network_target",
+            "benchmark": {
+                "case_id": "in-vitro/web_security/vm0",
+                "target": target,
+                "task": canonical_task,
+                "source": "test-registry",
+            },
+        },
+        input_object=InputObject(
+            "bench-input", "network_target", target, source_name=target
+        ),
+        target_object=TargetObject("bench-target", "network_target", target),
+        authorization=AuthorizationScope(allowed_targets=(target,)),
+    )
+    atomic_write_json(workspace / "task.json", task.to_dict())
+    return task
+
+
 def _uploaded_file_task(
     staging: Path,
     runs_root: Path,
@@ -291,7 +328,7 @@ async def test_web_autonomous_mode_dispatch_pentest(tmp_path: Path) -> None:
     model = CompletingModel(
         _invoke_decision(
             "pentest",
-            "web-pentest-audit",
+            "bench-input",
             "question-user-goal",
             "Assess the authorized network target.",
             "access_proof",
@@ -299,7 +336,7 @@ async def test_web_autonomous_mode_dispatch_pentest(tmp_path: Path) -> None:
     )
     executor = _executor(tmp_path, model=model, pentest=pentest)
 
-    result = await executor.execute(_network_task(runs))
+    result = await executor.execute(_benchmark_task(runs))
 
     assert result.raw_output["orchestration_status"] == "complete"
     assert result.status is ExecutionStatus.SUCCESS
@@ -677,18 +714,31 @@ async def test_subtask_dedups_network_target_when_both_refs_are_cited(
         "allocated_budget": 1.0,
         "rationale": "The model cited both the input object and the target object.",
     }
-    target = "http://127.0.0.1:8080/"
+    target = "in-vitro_web_security_vm0"
+    canonical_task = "Discover the target and obtain the flag."
+    workspace = tmp_path / "runs" / "web-both-network-refs"
+    workspace.mkdir(parents=True, exist_ok=True)
     task = TaskSpec(
         task_id="web-both-network-refs",
         domain="pentest",
         target=target,
-        goal="Assess the authorized network target.",
+        goal=canonical_task,
         success_conditions=("Target assessed.",),
-        metadata={"semantic_input_type": "network_target"},
+        metadata={
+            "semantic_input_type": "network_target",
+            "benchmark": {
+                "case_id": "in-vitro/web_security/vm0",
+                "target": target,
+                "task": canonical_task,
+                "source": "test-registry",
+            },
+        },
         input_object=InputObject("input", "network_target", target),
         target_object=TargetObject("target", "network_target", target),
         authorization=AuthorizationScope(allowed_targets=(target,)),
+        workspace=str(workspace),
     )
+    atomic_write_json(workspace / "task.json", task.to_dict())
     executor = _executor(
         tmp_path,
         model=CompletingModel(decision),

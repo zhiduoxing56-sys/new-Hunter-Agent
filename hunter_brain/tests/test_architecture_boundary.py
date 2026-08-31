@@ -11,6 +11,7 @@ EXPECTED_MODULES = {
     "capabilities.py",
     "decisions.py",
     "handoffs.py",
+    "invocation_bridge.py",
     "orchestrator.py",
     "question_generator.py",
     "result_interpreter.py",
