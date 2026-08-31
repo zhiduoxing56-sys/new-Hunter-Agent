@@ -1,6 +1,6 @@
 [submodule "pentestgpt-core"]
 	path = pentestgpt-core
-	url = https://github.com/zhiduoxing56-sys/new-Hunter-Agent.git
+	url = https://github.com/zhiduoxing56-sys/pentestgpt-core.git
 	branch = main
 [submodule "third_party/kong"]
 	path = third_party/kong
@@ -10,4 +10,4 @@
 	url = https://github.com/nebulae/trudi.git
 [submodule "third_party/fuzzingbrain"]
 	path = third_party/fuzzingbrain
-	url = https://github.com/o2lab/FuzzingBrain-V2.git
+	url = https://github.com/zhiduoxing56-sys/FuzzingBrain-V2.git
