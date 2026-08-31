@@ -105,6 +105,38 @@ async def test_autonomous_mode_reaches_injected_hunter_brain_executor(
 
 
 @pytest.mark.asyncio
+async def test_default_runtime_builds_four_domain_autonomous_executor(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("HUNTER_MODEL_API_KEY", "test-only-key")
+    runtime = HunterRuntime(
+        WebConfig(
+            project_root=Path(__file__).resolve().parents[2],
+            runs_root=tmp_path / "runs",
+            staging_root=tmp_path / "staging",
+            worker_count=1,
+        )
+    )
+    try:
+        assert runtime.autonomous_executor is not None
+        orchestrator = runtime.autonomous_executor.orchestrator
+        assert set(orchestrator.adapters._adapters) == {
+            "dfir",
+            "reverse",
+            "pentest",
+            "vulnerability_research",
+        }
+        assert orchestrator.supervisor.catalog.capability_ids == (
+            "dfir",
+            "reverse",
+            "pentest",
+            "vulnerability_research",
+        )
+    finally:
+        runtime.close(wait=True)
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("mode", "domain", "agent_id"),
     (

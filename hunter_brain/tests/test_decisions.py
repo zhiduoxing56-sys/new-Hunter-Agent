@@ -128,6 +128,40 @@ def test_incomplete_invoke_decisions_are_rejected(change: dict[str, object]) -> 
         decision_from_dict(value)
 
 
+@pytest.mark.parametrize("raw", ["1.0", "3", "2.5e1"])
+def test_quoted_numeric_budget_from_real_model_is_accepted(raw: str) -> None:
+    value = _invoke().to_dict()
+    value["allocated_budget"] = raw
+
+    decision = decision_from_dict(value)
+
+    assert isinstance(decision, InvokeCapabilityDecision)
+    assert decision.allocated_budget == float(raw)
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [("medium", 1.0), ("MEDIUM_TO_HIGH", 1.5), ("high", 2.0)],
+)
+def test_cost_tier_budget_from_real_model_is_mapped(raw: str, expected: float) -> None:
+    value = _invoke().to_dict()
+    value["allocated_budget"] = raw
+
+    decision = decision_from_dict(value)
+
+    assert isinstance(decision, InvokeCapabilityDecision)
+    assert decision.allocated_budget == expected
+
+
+@pytest.mark.parametrize("raw", ["not-a-number", "", "nan", "inf", True])
+def test_non_numeric_budget_is_still_rejected(raw: object) -> None:
+    value = _invoke().to_dict()
+    value["allocated_budget"] = raw
+
+    with pytest.raises(ValueError, match="allocated_budget"):
+        decision_from_dict(value)
+
+
 def test_complete_decision_requires_evidence_for_each_condition() -> None:
     with pytest.raises(ValueError, match="must not be empty"):
         CompleteDecision(

@@ -77,6 +77,47 @@ def test_cross_domain_candidates_come_from_artifacts_and_catalog(
     )
 
 
+def test_cross_domain_questions_are_exploratory_not_completion_blockers(
+    tmp_path: Path,
+) -> None:
+    task = TaskSpec("nonblocking-task", "dfir", "input", "Investigate safely")
+    state = HunterWorldState.from_task(task)
+    path = tmp_path / "trigger.bin"
+    path.write_bytes(b"crash input")
+    result = AgentResult(
+        task_id=task.task_id,
+        agent_id="dfir",
+        domain="dfir",
+        status=ExecutionStatus.SUCCESS,
+        started_at="2026-08-31T00:00:00+00:00",
+        finished_at="2026-08-31T00:00:01+00:00",
+        summary="Recovered a trigger sample.",
+        artifacts=(
+            Artifact.from_path("trigger", "trigger_sample", path, producer="dfir"),
+        ),
+    )
+    preview = WorldStateUpdater().apply(state, result)
+    decision = InvokeCapabilityDecision(
+        "dfir",
+        ("input",),
+        "q",
+        "Analyze.",
+        ("input",),
+        (),
+        (),
+        ("finding",),
+        1.0,
+        "Need it.",
+    )
+
+    proposal = CrossDomainQuestionGenerator().interpret(
+        preview=preview, decision=decision, result=result
+    )
+
+    assert len(proposal.new_questions) == 1
+    assert proposal.new_questions[0].priority < 80
+
+
 def test_no_question_is_generated_without_a_compatible_other_domain(
     tmp_path: Path,
 ) -> None:

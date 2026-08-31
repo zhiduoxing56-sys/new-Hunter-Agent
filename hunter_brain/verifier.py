@@ -10,7 +10,7 @@ from typing import Any, Protocol
 
 from pentestgpt_agent.protocol import AgentResult, RunLayout, TaskSpec
 
-from .decisions import CompleteDecision, VerifyDecision
+from .decisions import CompleteDecision, VerificationCheck, VerifyDecision
 from .state import HunterWorldState
 from .state_updater import QuestionResolution
 
@@ -224,7 +224,8 @@ class GlobalVerifier:
                 )
                 continue
             for check_name in decision.verification_checks:
-                if check_name == "evidence_reference_valid":
+                check = VerificationCheck(check_name)
+                if check is VerificationCheck.EVIDENCE_REFERENCE_VALID:
                     passed = (
                         evidence.artifact_ref is None
                         or evidence.artifact_ref in state.artifacts
@@ -238,17 +239,17 @@ class GlobalVerifier:
                         checks,
                         issues,
                     )
-                elif check_name in {
-                    "artifact_exists",
-                    "sha256_matches",
-                    "artifact_belongs_to_task",
+                elif check in {
+                    VerificationCheck.ARTIFACT_EXISTS,
+                    VerificationCheck.SHA256_MATCHES,
+                    VerificationCheck.ARTIFACT_BELONGS_TO_TASK,
                 }:
                     self._check_state_artifact(
                         check_name, evidence_id, state, checks, issues
                     )
-                elif check_name == "semantic_support":
+                elif check is VerificationCheck.SEMANTIC_SUPPORT:
                     semantic_required = True
-                else:
+                else:  # pragma: no cover - vocabulary is closed in VerifyDecision
                     issues.append(
                         VerificationIssue(
                             VerificationCode.CHECK_UNSUPPORTED,

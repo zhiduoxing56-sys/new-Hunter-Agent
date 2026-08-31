@@ -6,18 +6,20 @@ brain receives only the frozen ``AgentAdapter`` interface through its registry.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 
-from hunter_brain.capabilities import CapabilityCatalog, DEFAULT_CAPABILITIES
+from hunter_brain.capabilities import default_catalog
 from hunter_brain.orchestrator import (
     CapabilityAdapterRegistry,
     HunterOrchestrator,
     OrchestrationStatus,
 )
 from hunter_brain.question_generator import CrossDomainQuestionGenerator
+from hunter_brain.result_interpreter import EvidenceGroundedResultInterpreter
 from hunter_brain.supervisor import (
+    DecisionModel,
     DeepSeekDecisionModel,
     DeepSeekSupervisorConfig,
     HunterSupervisor,
@@ -31,6 +33,7 @@ from pentestgpt_agent.protocol import (
     ExecutionStatus,
     TaskSpec,
 )
+from pentestgpt_agent.protocol.io import atomic_write_json
 
 from autopenbench_adapter.protocol import AutoPenBenchProtocolAdapter
 from .kong import KongAdapter
@@ -80,6 +83,7 @@ class HunterBrainTaskExecutor:
 
     async def execute(self, task_spec: TaskSpec) -> AgentResult:
         started_at = datetime.now(UTC).isoformat()
+        task_spec = self._ensure_success_conditions(task_spec)
         outcome = await self.orchestrator.run(task_spec)
         successful = outcome.status is OrchestrationStatus.COMPLETE
         partial = outcome.status in {
@@ -128,6 +132,28 @@ class HunterBrainTaskExecutor:
             },
         )
 
+    @staticmethod
+    def _ensure_success_conditions(task_spec: TaskSpec) -> TaskSpec:
+        """Give every task at least one evidence-grounded success condition.
+
+        Layer 1 produces tasks without ``success_conditions`` for open-ended
+        goals. The global completion gate then has nothing to cite, so the
+        supervisor cannot build a valid ``complete`` decision and global
+        success becomes unreachable. A single deterministic default condition
+        is added here; completion still requires the supervisor to cite real
+        evidence for it, so ``AgentResult SUCCESS != global SUCCESS`` holds.
+        """
+        if task_spec.success_conditions:
+            return task_spec
+        condition = (
+            f"Ground the user goal with verified professional evidence: "
+            f"{task_spec.goal.strip()[:160]}"
+        )
+        updated = replace(task_spec, success_conditions=(condition,))
+        assert updated.workspace is not None
+        atomic_write_json(Path(updated.workspace) / "task.json", updated.to_dict())
+        return updated
+
 
 def build_analysis_brain_adapters(
     *,
@@ -155,6 +181,8 @@ def build_hunter_brain_adapters(
     repo_root: Path,
     vulnerability_research_adapter: AgentAdapter | None = None,
     pentest_adapter: AgentAdapter | None = None,
+    dfir_adapter: AgentAdapter | None = None,
+    reverse_adapter: AgentAdapter | None = None,
     trudi_mode: str = "lite",
     java_home: Path | None = None,
     ghidra_dir: Path | None = None,
@@ -175,8 +203,8 @@ def build_hunter_brain_adapters(
         kong_config_dir=kong_config_dir,
     )
     return HunterBrainAdapters(
-        kong=analysis.kong,
-        trudi=analysis.trudi,
+        kong=reverse_adapter or analysis.kong,
+        trudi=dfir_adapter or analysis.trudi,
         pentest=pentest_adapter or AutoPenBenchProtocolAdapter(),
         vulnerability_research=vulnerability_research_adapter
         or FuzzingBrainAdapter(repo_root=repo_root),
@@ -188,13 +216,30 @@ def build_analysis_brain_executor(
     repo_root: Path,
     runs_root: Path,
     config: DeepSeekSupervisorConfig | None = None,
+    model: DecisionModel | None = None,
+    pentest_adapter: AgentAdapter | None = None,
+    vulnerability_research_adapter: AgentAdapter | None = None,
+    dfir_adapter: AgentAdapter | None = None,
+    reverse_adapter: AgentAdapter | None = None,
 ) -> HunterBrainTaskExecutor:
-    """Build the Web autonomous executor from currently mature real backends."""
+    """Build the Web autonomous executor from all four real professional backends.
 
-    catalog = CapabilityCatalog(DEFAULT_CAPABILITIES[:2])
-    adapters = build_analysis_brain_adapters(repo_root=repo_root)
+    This is the Web's single default composition root. It reuses
+    ``build_hunter_brain_adapters`` and ``default_catalog`` so the Web
+    autonomous mode and the four-domain assembly share one registration path
+    instead of maintaining a second registry inside the Web layer.
+    """
+
+    catalog = default_catalog()
+    adapters = build_hunter_brain_adapters(
+        repo_root=repo_root,
+        pentest_adapter=pentest_adapter,
+        vulnerability_research_adapter=vulnerability_research_adapter,
+        dfir_adapter=dfir_adapter,
+        reverse_adapter=reverse_adapter,
+    )
     supervisor = HunterSupervisor(
-        model=DeepSeekDecisionModel(config or DeepSeekSupervisorConfig.from_env()),
+        model=model or DeepSeekDecisionModel(config or DeepSeekSupervisorConfig.from_env()),
         catalog=catalog,
     )
     return HunterBrainTaskExecutor(
@@ -203,6 +248,7 @@ def build_analysis_brain_executor(
             adapters=adapters.registry(),
             runs_root=runs_root,
             question_generator=CrossDomainQuestionGenerator(catalog),
+            result_interpreter=EvidenceGroundedResultInterpreter(),
             verifier=GlobalVerifier(),
         )
     )

@@ -17,9 +17,17 @@ from integrations.trudi.full_runner import (
     _trace_summary,
     _turn_budget,
 )
-from integrations.trudi.full_server import MINIMAL_FULL_TOOLS, mcp as full_mcp
+from integrations.trudi.full_tools import MINIMAL_FULL_TOOLS
 from integrations.trudi.parser import full_findings, load_full, load_triage, triage_finding
 from pentestgpt_agent.protocol import AdapterRunner, ExecutionStatus, RunLayout, TaskSpec
+
+try:
+    from integrations.trudi.full_server import mcp as full_mcp
+except Exception as _full_server_exc:  # pragma: no cover - environment dependent
+    full_mcp = None
+    _FULL_SERVER_IMPORT_ERROR = f"{type(_full_server_exc).__name__}: {_full_server_exc}"
+else:
+    _FULL_SERVER_IMPORT_ERROR = None
 
 
 def test_parser_requires_successful_structured_hash_output(tmp_path: Path) -> None:
@@ -47,6 +55,10 @@ def test_parser_requires_successful_structured_hash_output(tmp_path: Path) -> No
     assert finding.metadata["sha256"] == "s256"
 
 
+@pytest.mark.skipif(
+    full_mcp is None,
+    reason=f"TRUDI full server stack is unavailable in this test venv: {_FULL_SERVER_IMPORT_ERROR}",
+)
 @pytest.mark.asyncio
 async def test_full_server_exposes_only_qualified_official_tools() -> None:
     tools = await full_mcp.list_tools()

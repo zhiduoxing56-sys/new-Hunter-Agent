@@ -109,24 +109,14 @@ async def test_explicit_deterministic_verification_checks_world_state_artifact(
     assert all(item.passed for item in outcome.checks)
 
 
-@pytest.mark.asyncio
-async def test_unsupported_external_check_is_not_silently_accepted(tmp_path: Path) -> None:
-    task, state, _, _ = await _result_state_layout(tmp_path)
-    decision = VerifyDecision(
-        "Reproduce the exploit.",
-        ("mock-evidence",),
-        ("exploit_reproduces",),
-        "Reproduction requires a dedicated verifier.",
-    )
-
-    outcome = await GlobalVerifier().verify_request(
-        task=task,
-        state=state,
-        decision=decision,
-    )
-
-    assert outcome.status is GlobalVerificationStatus.FAILED
-    assert outcome.issues[0].code is VerificationCode.CHECK_UNSUPPORTED
+def test_unsupported_external_check_is_not_silently_accepted() -> None:
+    with pytest.raises(ValueError, match="closed vocabulary"):
+        VerifyDecision(
+            "Reproduce the exploit.",
+            ("mock-evidence",),
+            ("exploit_reproduces",),
+            "Reproduction requires a dedicated verifier.",
+        )
 
 
 @dataclass

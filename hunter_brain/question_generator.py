@@ -52,7 +52,12 @@ class CrossDomainQuestionGenerator:
                         "What security-relevant conclusions should be derived from "
                         f"artifact {artifact_id} of type {artifact.artifact_type}?"
                     ),
-                    priority=80,
+                    # Cross-domain follow-up is exploratory, not a completion
+                    # blocker. It sits below the critical-question threshold so
+                    # the global loop can complete once the primary goal is
+                    # grounded in evidence, while still surfacing the follow-up
+                    # for the supervisor to pursue when it adds value.
+                    priority=70,
                     source=artifact_id,
                 )
             )

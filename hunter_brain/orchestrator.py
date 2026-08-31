@@ -42,7 +42,7 @@ from .supervisor import (
     SupervisorModelError,
     SupervisorOutputError,
 )
-from .validator import BudgetSnapshot
+from .validator import BudgetSnapshot, resolve_input_type
 from .verifier import GlobalVerificationOutcome, GlobalVerificationStatus, GlobalVerifier
 
 
@@ -587,7 +587,9 @@ class HunterOrchestrator:
             primary_target_object = TargetObject(
                 "brain-primary-target", first_type, first_value
             )
-            allowed_targets = tuple(value for _, value, _ in resolved)
+            allowed_targets = tuple(
+                dict.fromkeys(value for _, value, _ in resolved)
+            )
             allowed_read_paths = ()
             staged = [
                 {"source_ref": ref, "type": input_type, "value": value}
@@ -650,16 +652,20 @@ class HunterOrchestrator:
         state: HunterWorldState,
     ) -> tuple[str, str, Path | None]:
         if task.input_object is not None and reference == task.input_object.input_id:
-            input_type = task.input_object.kind
-            file_type = task.metadata.get("file_type", {})
-            if isinstance(file_type, dict) and isinstance(
-                file_type.get("normalized_type"), str
-            ):
-                input_type = str(file_type["normalized_type"])
+            input_type = resolve_input_type(task) or task.input_object.kind
             path = Path(task.input_object.path) if task.input_object.path else None
             return input_type, task.input_object.original_value, path
         if task.target_object is not None and reference == task.target_object.target_id:
-            return task.target_object.kind, task.target_object.value, None
+            shared_path = (
+                Path(task.input_object.path)
+                if task.input_object is not None and task.input_object.path is not None
+                else None
+            )
+            return (
+                resolve_input_type(task) or task.target_object.kind,
+                task.target_object.value,
+                shared_path,
+            )
         artifact = state.artifacts.get(reference)
         if artifact is not None:
             path = Path(artifact.path).resolve()

@@ -12,12 +12,13 @@ import httpx
 from pentestgpt_agent.protocol import TaskSpec
 
 from .capabilities import CapabilityCatalog
-from .decisions import SupervisorDecision, decision_from_dict
+from .decisions import SupervisorDecision, VerificationCheck, decision_from_dict
 from .state import HunterWorldState
 from .validator import (
     BudgetSnapshot,
     DecisionValidation,
     DeterministicDecisionValidator,
+    resolve_input_type,
 )
 
 
@@ -30,7 +31,21 @@ exist in the supplied compact context. Do not repeat a capability/input/question
 combination after it made no progress. Professional backends decide their own
 internal execution. Choose complete only when evidence satisfies every success
 condition and no critical question remains. Otherwise invoke one capability,
-request verification, or report a genuine block."""
+request verification, or report a genuine block.
+Never invent question identifiers: cite only question_ids present in
+unresolved_questions. When no critical question (priority >= 80) remains and
+grounded evidence satisfies every success condition, choose complete even if
+non-critical cross-domain follow-up questions remain unresolved; pursuing them
+is optional, not required for completion.
+For a verify action, verification_checks must contain only names from the
+supplied verification_checks_vocabulary; never invent a check name.
+Structured formats: complete.satisfied_conditions must be a JSON object mapping
+each success condition to an array of evidence_ids that exist in the context
+(e.g. {"condition": ["evidence_id"]}); verify.evidence_refs is an array of
+evidence_ids; invoke_capability.allocated_budget is a number or a cost tier.
+basis_input_refs must contain only Layer-1 input/target ids; to ground a call on
+an artifact or evidence, use input_refs plus basis_fact_refs and
+basis_evidence_refs instead."""
 
 
 class SupervisorConfigurationError(ValueError):
@@ -268,6 +283,7 @@ class HunterSupervisor:
         return {
             "decision_schema_version": "1.0",
             "decision_contract": self._decision_contract(),
+            "verification_checks_vocabulary": VerificationCheck.meanings(),
             "user_goal": state.user_goal,
             "success_conditions": list(state.success_conditions),
             "world_state_summary": {
@@ -369,23 +385,17 @@ class HunterSupervisor:
     ) -> dict[str, Any]:
         layer_one: list[dict[str, Any]] = []
         if task.input_object is not None:
-            normalized = task.metadata.get("file_type", {})
-            normalized_type = (
-                normalized.get("normalized_type")
-                if isinstance(normalized, dict)
-                else None
-            )
             layer_one.append(
                 {
                     "input_id": task.input_object.input_id,
-                    "type": normalized_type or task.input_object.kind,
+                    "type": resolve_input_type(task) or task.input_object.kind,
                 }
             )
         if task.target_object is not None:
             layer_one.append(
                 {
                     "input_id": task.target_object.target_id,
-                    "type": task.target_object.kind,
+                    "type": resolve_input_type(task) or task.target_object.kind,
                 }
             )
         return {

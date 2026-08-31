@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, TypeAlias
+
+from .capabilities import CapabilityCost
 
 
 DECISION_SCHEMA_VERSION = "1.0"
@@ -15,6 +18,30 @@ class DecisionAction(StrEnum):
     VERIFY = "verify"
     COMPLETE = "complete"
     BLOCKED = "blocked"
+
+
+class VerificationCheck(StrEnum):
+    """The single, explicit, finite verification vocabulary.
+
+    The global verifier only ever executes checks from this set. A supervisor
+    may not invent a natural-language check name; unknown names fail closed.
+    """
+
+    EVIDENCE_REFERENCE_VALID = "evidence_reference_valid"
+    ARTIFACT_EXISTS = "artifact_exists"
+    SHA256_MATCHES = "sha256_matches"
+    ARTIFACT_BELONGS_TO_TASK = "artifact_belongs_to_task"
+    SEMANTIC_SUPPORT = "semantic_support"
+
+    @classmethod
+    def meanings(cls) -> dict[str, str]:
+        return {
+            cls.EVIDENCE_REFERENCE_VALID.value: "evidence points to an artifact the task owns",
+            cls.ARTIFACT_EXISTS.value: "the evidence artifact exists on disk",
+            cls.SHA256_MATCHES.value: "the evidence artifact SHA-256 matches world state",
+            cls.ARTIFACT_BELONGS_TO_TASK.value: "the evidence artifact belongs to this task lineage",
+            cls.SEMANTIC_SUPPORT.value: "a configured semantic model supports the conclusion",
+        }
 
 
 def _text(value: str, label: str) -> None:
@@ -100,6 +127,14 @@ class VerifyDecision:
         _text(self.objective, "verification objective")
         _refs(self.evidence_refs, "evidence_refs", required=True)
         _refs(self.verification_checks, "verification_checks", required=True)
+        unknown = [
+            check for check in self.verification_checks if check not in VerificationCheck
+        ]
+        if unknown:
+            raise ValueError(
+                "verification_checks must use the closed vocabulary; "
+                f"unknown: {', '.join(unknown)}"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -309,8 +344,38 @@ def _string_tuple(value: dict[str, Any], key: str) -> tuple[str, ...]:
     return _strings(value.get(key), key)
 
 
+# Real model fallbacks for ``allocated_budget``: the capability cost vocabulary
+# is occasionally echoed instead of a numeric allocation. The tiers are an
+# explicit finite enum (``CapabilityCost``); each maps to a deterministic
+# default budget. No free-text budget parsing is ever accepted.
+BUDGET_BY_COST = {
+    CapabilityCost.MEDIUM: 1.0,
+    CapabilityCost.MEDIUM_TO_HIGH: 1.5,
+    CapabilityCost.HIGH: 2.0,
+}
+
+
 def _number(value: dict[str, Any], key: str) -> float:
     item = value.get(key)
-    if isinstance(item, bool) or not isinstance(item, (int, float)):
+    if isinstance(item, bool):
         raise ValueError(f"{key} must be a number")
-    return float(item)
+    if isinstance(item, (int, float)):
+        return float(item)
+    if isinstance(item, str):
+        stripped = item.strip().lower()
+        try:
+            cost = CapabilityCost(stripped)
+        except ValueError:
+            cost = None
+        if cost in BUDGET_BY_COST:
+            return BUDGET_BY_COST[cost]
+        # Real model JSON occasionally quotes numbers (e.g. "1.0"). Accept a
+        # clearly numeric string rather than failing the whole decision.
+        try:
+            parsed = float(item)
+        except (TypeError, ValueError):
+            raise ValueError(f"{key} must be a number") from None
+        if not math.isfinite(parsed):
+            raise ValueError(f"{key} must be a finite number")
+        return parsed
+    raise ValueError(f"{key} must be a number")

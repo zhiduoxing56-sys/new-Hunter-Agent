@@ -19,6 +19,29 @@ from .handoffs import HandoffCarrier, HandoffDescriptor
 from .state import HunterWorldState
 
 
+def resolve_input_type(task: TaskSpec) -> str | None:
+    """Resolve the semantic Layer-1 input type used for capability compatibility.
+
+    Layer 1 stores its deterministic semantic classification in
+    ``metadata.semantic_input_type`` when it exists (see the intake semantic
+    bridge). Fall back to the audited normalized content type, then to the raw
+    input kind, so hand-built TaskSpecs keep the previous behavior.
+    """
+    semantic = task.metadata.get("semantic_input_type")
+    if isinstance(semantic, str) and semantic.strip():
+        return semantic
+    file_type = task.metadata.get("file_type")
+    if isinstance(file_type, dict) and isinstance(
+        file_type.get("normalized_type"), str
+    ):
+        return file_type["normalized_type"]
+    if task.input_object is not None:
+        return task.input_object.kind
+    if task.target_object is not None:
+        return task.target_object.kind
+    return None
+
+
 class ValidationCode(StrEnum):
     TASK_MISMATCH = "task_mismatch"
     UNKNOWN_CAPABILITY = "unknown_capability"
@@ -394,22 +417,13 @@ class DeterministicDecisionValidator:
         state: HunterWorldState,
     ) -> tuple[str | None, str | None]:
         if task.input_object is not None and reference == task.input_object.input_id:
-            normalized = task.metadata.get("file_type", {})
-            if isinstance(normalized, dict) and isinstance(
-                normalized.get("normalized_type"), str
-            ):
-                return str(normalized["normalized_type"]), (
-                    task.input_object.original_value
-                    if task.input_object.kind == "network_target"
-                    else None
-                )
-            return task.input_object.kind, (
+            return resolve_input_type(task), (
                 task.input_object.original_value
                 if task.input_object.kind == "network_target"
                 else None
             )
         if task.target_object is not None and reference == task.target_object.target_id:
-            return task.target_object.kind, task.target_object.value
+            return resolve_input_type(task), task.target_object.value
         if reference in state.artifacts:
             artifact = state.artifacts[reference]
             handoff = HandoffDescriptor.from_metadata(artifact.metadata)

@@ -13,6 +13,7 @@ EXPECTED_MODULES = {
     "handoffs.py",
     "orchestrator.py",
     "question_generator.py",
+    "result_interpreter.py",
     "state.py",
     "state_updater.py",
     "supervisor.py",
