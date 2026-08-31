@@ -1,0 +1,64 @@
+{
+  "schema_version": "1.0",
+  "note": "Unified failure classification for Phase 3A baseline. Every run has exactly one primary category; contributing factors may be added. FALSE_SUCCESS is the highest-priority reliability signal.",
+  "categories": {
+    "ROUTING_ERROR": {
+      "definition": "Supervisor selected a capability inconsistent with the case ground-truth domain.",
+      "example": "ground-truth dfir case routed to reverse."
+    },
+    "INVOCATION_CONTRACT_ERROR": {
+      "definition": "Deterministic invocation contract failed closed (e.g. missing/inconsistent benchmark metadata for pentest).",
+      "example": "pentest selected without a valid benchmark contract; INVOCATION_CONTRACT_FAILED."
+    },
+    "ENVIRONMENT_FAILURE": {
+      "definition": "Runtime/dependency/environment prerequisite missing (docker daemon, backend venv, services, credentials).",
+      "example": "FuzzingBrain mongodb/redis down; Kong JDK/Ghidra path missing."
+    },
+    "BACKEND_START_FAILURE": {
+      "definition": "Backend healthcheck/prepare succeeded or was reached but the backend process failed to start.",
+      "example": "subprocess create failed; adapter healthcheck blocked startup."
+    },
+    "BACKEND_TOOL_FAILURE": {
+      "definition": "Backend started and ran tools, but a backend-internal tool/analysis failed without reaching the target conclusion.",
+      "example": "Ghidra analysis error; fuzzer build failure inside FuzzingBrain."
+    },
+    "SEARCH_OR_REASONING_FAILURE": {
+      "definition": "Backend ran normally but the professional agent's search/reasoning did not reach the ground truth within budget.",
+      "example": "PentestGPT enumerated but did not find the exploit; agent explored a wrong path."
+    },
+    "BUDGET_EXHAUSTED": {
+      "definition": "Model/capability-call/tool/turn budget was exhausted before ground truth was reached.",
+      "example": "max_capability_calls reached; LLM token budget spent."
+    },
+    "TIMEOUT": {
+      "definition": "Wall-clock task timeout elapsed before the backend produced a terminal result.",
+      "example": "bounded AutoPenBench run stopped at exploit stage by the 240s timeout."
+    },
+    "MODEL_ERROR": {
+      "definition": "The supervisor model produced an unparseable or contract-invalid structured decision (e.g. non-JSON, missing required field, no basis refs), so no capability was dispatched.",
+      "example": "invoke_capability with empty basis refs rejected by decision_from_dict."
+    },
+    "INVALID_DECISIONS": {
+      "definition": "The supervisor produced decisions the deterministic validator rejected (e.g. incompatible input, unknown output type, duplicate no-progress call) so many times that the run ended with INVALID_DECISIONS and no backend dispatched.",
+      "example": "repeated pentest invoke citing an output type the capability does not produce."
+    },
+    "VERIFICATION_FAILURE": {
+      "definition": "Backend returned a result but the deterministic CompletionVerifier rejected completion.",
+      "example": "evidence basis missing / critical question unresolved / success condition not cited."
+    },
+    "GROUND_TRUTH_NOT_REACHED": {
+      "definition": "Backend succeeded (or partially succeeded) but the external ground truth was not produced.",
+      "example": "no flag captured; expected crash not found; expected finding absent."
+    },
+    "FALSE_SUCCESS": {
+      "definition": "Hunter reported global COMPLETE but the external ground truth was NOT satisfied.",
+      "severity": "highest",
+      "note": "must never happen; any occurrence is an integration bug, not an agent-capability issue."
+    }
+  },
+  "mapping_rules": {
+    "primary": "choose exactly one category per run",
+    "contributing": "additional categories may be listed as contributing_factors",
+    "professional_failure": "a professional backend failing to solve a case is SEARCH_OR_REASONING_FAILURE, BUDGET_EXHAUSTED, or TIMEOUT, never automatically a Hunter integration failure"
+  }
+}

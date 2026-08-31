@@ -1,0 +1,54 @@
+{
+  "manifest_version": "1.0",
+  "description": "Frozen environment + budgets for Hunter-Agent Phase 3A capability evaluation baseline. Every run must reference this manifest (evaluation_id = baseline_2026-08-31).",
+  "evaluation_id": "baseline_2026-08-31",
+  "commits": {
+    "hunter_agent": "8ddee70",
+    "pentestgpt_core": "ae34394",
+    "trudi": "10559b1",
+    "kong": "8c4ee4b",
+    "vulnerability_research_fuzzingbrain": "a9a1fbf",
+    "autopenbench": "9c4890a"
+  },
+  "environment": {
+    "os": "Ubuntu 24.04.3 LTS",
+    "arch": "x86_64",
+    "python": "3.12.3",
+    "node": "18.19.1",
+    "docker": "29.1.3"
+  },
+  "supervisor_model": {
+    "provider": "deepseek_openai_compatible",
+    "model": "deepseek-v4-flash",
+    "endpoint": "https://api.deepseek.com/chat/completions",
+    "temperature": 0,
+    "reasoning": "not_applicable"
+  },
+  "professional_backend_models": {
+    "trudi_lite": {"model": "none", "note": "TRUDI lite runs local MCP tools (hash/stat/strings); no LLM"},
+    "trudi_full": {"model": "deepseek-v4-flash", "note": "not used in this baseline"},
+    "fuzzingbrain": {"model": "deepseek-v4-flash", "env": "LLM_DEFAULT_MODEL"},
+    "kong_analyze": {"model": "deepseek-v4-flash", "config": "custom_api_key/custom_model", "endpoint": "https://api.deepseek.com"},
+    "autopenbench_pentestgpt": {"model": "deepseek-v4-flash", "env": "HUNTER_MODEL_NAME"}
+  },
+  "orchestration_limits": {
+    "max_decisions": 8,
+    "max_capability_calls": 3,
+    "max_rejected_decisions": 3
+  },
+  "budget_profiles": {
+    "baseline_pentest_240s": {"domain": "pentest", "task_timeout_seconds": 240, "note": "bounded AutoPenBench run; may stop mid-exploit"},
+    "baseline_vr_300s": {"domain": "vulnerability_research", "task_timeout_seconds": 300, "note": "FuzzingBrain OSS-Fuzz fixture run"},
+    "baseline_dfir_300s": {"domain": "dfir", "task_timeout_seconds": 300, "note": "reserved"},
+    "baseline_reverse_600s": {"domain": "reverse", "task_timeout_seconds": 600, "note": "reserved"}
+  },
+  "evaluation_entry": {
+    "required": "every case enters through the real default Hunter entry (Layer-1 -> Supervisor -> orchestrator -> real adapter); no direct backend calls",
+    "forbidden": [
+      "direct professional-backend invocation as Hunter E2E evidence",
+      "weakening CompletionVerifier / contract validation / fail-closed",
+      "hardcoded cross-domain chains",
+      "cherry-picking cases by expected success"
+    ]
+  }
+}
