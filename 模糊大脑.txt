@@ -1,0 +1,161 @@
+
+• 要让模糊大脑从“源码和脚本存在”变成“Hunter 内完全连通、可稳定使用”，还需要完成下面 6
+  个阶段。
+
+  ## 一、修好 FuzzingBrain 独立运行环境
+
+  这是后续接入的基础。
+
+  - 解决上游 Z-VulnSentinel 子模块缺少 .gitmodules 映射的问题。
+  - 为 third_party/fuzzingbrain 建立独立 Python 虚拟环境。
+  - 安装 requirements.txt。
+  - 启动并验证 MongoDB、Redis。
+  - 解决当前用户无权访问 Docker daemon 的问题。
+  - 拉取并验证 OSS-Fuzz 基础镜像。
+  - 不直接使用会覆盖 /etc/docker/daemon.json 的现有部署脚本，改造成项目内、非破坏性配
+    置。
+
+  - 修正错误的启动方式：
+
+  python -c "import fuzzingbrain_deepseek_adapter" -m fuzzingbrain.main
+
+  需要改为真正能先加载补丁、再执行 fuzzingbrain.main 的启动器。
+
+  验收标准：FuzzingBrain 自身测试通过，MongoDB、Redis、Docker 健康。
+
+  ## 二、完成本机 DeepSeek 接入
+
+  不能只依赖队友环境中的测试结论。
+
+  - 将 DeepSeek 补丁部署到 FuzzingBrain 环境。
+  - 复用 Hunter/Kong 的统一密钥配置，不能复制密钥、写死密钥或要求每个后端重复输入。
+  - 密钥只在子进程环境中注入，不进入任务、日志和 AgentResult。
+  - 验证 deepseek-v4-flash 调用。
+  - 验证 token、费用、超时、认证失败和限流处理。
+  - 验证 Flash → Pro fallback；如果实际账号没有 Pro，则不能宣称 fallback 可用。
+
+  验收标准：本机真实 DeepSeek 冒烟成功，并留下不含密钥的审计证据。
+
+  ## 三、跑通一个真实 FuzzingBrain 案例
+
+  当前最缺的是实际输出格式。
+
+  建议先使用隔离、明确授权的已知案例，不扫描外部真实目标。
+
+  需要记录：
+
+  - FuzzingBrain 任务状态完整流转。
+  - MongoDB 中任务文档和 PoV 文档的结构。
+  - workspace/<task>/results/ 目录结构。
+  - 崩溃样本、PoV、复现日志和补丁产物位置。
+  - 进程退出码与数据库状态之间的关系。
+  - “没发现漏洞”“任务失败”“超时”“产生有效崩溃”的差别。
+
+  cJSON 未必能稳定产生漏洞证据，因此还需要一个固定、已知可触发的本地测试靶标作为确定性
+  验收样本。
+
+  验收标准：至少一次完整任务产生可复现证据；至少验证一次无漏洞或失败路径。
+
+  ## 四、开发正式 FuzzingBrainAdapter
+
+  Adapter 必须遵守现有通用协议，不能让全局大脑识别 FuzzingBrain 的内部细节。
+
+  建议实现：
+
+  integrations/fuzzingbrain/
+  ├── __init__.py
+  ├── adapter.py
+  ├── runner.py
+  ├── parser.py
+  └── tests/
+
+  核心职责：
+
+  - healthcheck()：检查 Docker、MongoDB、Redis、Python 环境、DeepSeek配置。
+  - prepare()：把通用 TaskSpec 转换成 FuzzingBrain CLI 输入。
+  - run()：启动隔离子进程，实施超时和预算限制。
+  - collect()：解析 MongoDB、results 和 logs。
+  - stop()：可靠终止任务及其容器/子进程。
+  - 输出统一 AgentResult。
+  - 将 PoV、crash、补丁、日志登记为带哈希的 Artifact 和 Evidence。
+  - 将原始错误映射为统一错误类别。
+  - 对路径进行限制，禁止读取任务目录以外的用户文件。
+
+  至少要处理这些结果：
+
+  - 成功发现并复现漏洞
+  - 正常完成但未发现漏洞
+  - 部分结果
+  - DeepSeek 失败
+  - 构建失败
+  - fuzzer 超时
+  - Docker/MongoDB/Redis 故障
+  - 用户取消
+
+  ## 五、注册为第四个专业能力
+
+  将 Adapter 通用地注册到：
+
+  vulnerability_research → FuzzingBrainAdapter
+
+  需要保证：
+
+  - 路由依据是能力目录、输入类型和未解决问题。
+  - 不能依据智能体名称硬编码特殊分支。
+  - source_code、source_tree、crash_bundle、decompiled_source 等输入能被选中。
+  - 产出的 vulnerability_bundle、crash_bundle、trigger_sample 能交给 Pentest、Kong 或
+    TRUDI。
+
+  - 其他智能体产生的合法产物也能交给 FuzzingBrain。
+  - 失败后全局大脑可以选择其他兼容能力或终止，不重复无意义调用。
+
+  还要修改当前构造逻辑，让 build_hunter_brain_adapters() 能创建真实 FuzzingBrain
+  Adapter，而不是要求调用方临时传入一个占位实现。
+
+  ## 六、完成分层与跨域验收
+
+  需要补齐以下测试：
+
+  1. FuzzingBrain Adapter 单元测试
+     校验任务转换、结果解析、错误和路径安全。
+
+  2. 第三层真实后端测试
+     TaskSpec → FuzzingBrain → AgentResult → 世界状态。
+
+  3. 第四层全局大脑测试
+     能根据未解决问题选择 FuzzingBrain，读取结果并重新规划。
+
+  4. 两两跨域测试
+     至少覆盖：
+      - TRUDI → Kong
+      - TRUDI → FuzzingBrain
+      - Kong → FuzzingBrain
+      - FuzzingBrain → Kong
+      - FuzzingBrain → Pentest
+      - Pentest → FuzzingBrain
+
+  5. 四后端完整闭环
+     使用能力目录动态路由，验证四个后端均可被调用，但不要求每个任务都调用四个。
+
+  6. 失败与终止测试
+     DeepSeek 失败、Docker 失败、构建失败、超时、无进展重复、预算耗尽和证据充分完成。
+
+  ## 最终“完全可用”标准
+
+  只有同时达到以下条件，才能称为完全连通：
+
+  - FuzzingBrain 能在本机独立稳定运行。
+  - 本机真实 DeepSeek 调用通过。
+  - 至少一个已知漏洞案例得到可复现 PoV。
+  - 正式 FuzzingBrainAdapter 完成。
+  - 输出符合 AgentResult 和共享边界协议。
+  - 证据和产物进入全局世界状态。
+  - 注册到 vulnerability_research 能力。
+  - 四个专业后端由统一能力目录动态选择。
+  - 两两跨域产物可以正确传递。
+  - 失败、超时、取消和重复调用均受控。
+  - 所有决策、执行和验证进入审计日志。
+  - 不硬编码路由、路径、密钥或特定智能体组合。
+
+  当前最合理的实施顺序是：修独立运行环境 → 本机 DeepSeek 冒烟 → 固定漏洞案例 → Adapter
+  → 全局注册 → 跨域与第四层测试。

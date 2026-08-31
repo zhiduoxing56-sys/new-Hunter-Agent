@@ -1,0 +1,72 @@
+{
+  "timestamp": "2026-08-30T16:27:35.085312+00:00",
+  "credential_source": "kong_sqlite_child_process",
+  "credential_persisted": false,
+  "flash": {
+    "ok": true,
+    "provider": "deepseek",
+    "model": "deepseek-v4-flash",
+    "content_exact_ok": true,
+    "usage": {
+      "input_tokens": 88,
+      "output_tokens": 16,
+      "total_tokens": 104
+    },
+    "estimated_cost_usd": 4.136e-05,
+    "latency_ms": 1824.62,
+    "fallback_used": false
+  },
+  "pro": {
+    "ok": true,
+    "provider": "deepseek",
+    "model": "deepseek-v4-pro",
+    "content_exact_ok": false,
+    "usage": {
+      "input_tokens": 88,
+      "output_tokens": 16,
+      "total_tokens": 104
+    },
+    "estimated_cost_usd": 0.000304,
+    "latency_ms": 3203.73,
+    "fallback_used": false,
+    "account_available": true
+  },
+  "timeout_probe": {
+    "ok": true,
+    "error": {
+      "type": "LLMTimeoutError",
+      "category": "LLMTimeoutError"
+    },
+    "timeout_seconds": 0.001
+  },
+  "fallback_probe": {
+    "ok": true,
+    "provider": "deepseek",
+    "model": "deepseek-v4-pro",
+    "content_exact_ok": false,
+    "usage": {
+      "input_tokens": 88,
+      "output_tokens": 16,
+      "total_tokens": 104
+    },
+    "estimated_cost_usd": 0.000304,
+    "latency_ms": 1798.62,
+    "fallback_used": true,
+    "primary_failure": "forced_rate_limit",
+    "secondary_call_real": true
+  },
+  "error_mapping": {
+    "authentication": {
+      "type": "LLMAuthError",
+      "category": "LLMAuthError"
+    },
+    "rate_limit": {
+      "type": "LLMRateLimitError",
+      "category": "LLMRateLimitError"
+    },
+    "timeout": {
+      "type": "LLMTimeoutError",
+      "category": "LLMTimeoutError"
+    }
+  }
+}

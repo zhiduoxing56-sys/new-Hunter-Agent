@@ -12,19 +12,51 @@ from web.app import create_app
 from web.runtime import HunterRuntime, WebConfig
 
 from pentestgpt_agent.protocol import ExecutionStatus
+from pentestgpt_agent.protocol import AdapterRunner, AgentResult, TaskSpec
 from pentestgpt_agent.protocol.mock_adapter import MockAdapter
+
+
+class RecordingExecutor:
+    def __init__(self, adapter: MockAdapter, runs_root: Path) -> None:
+        self.adapter = adapter
+        self.runs_root = runs_root
+        self.tasks: list[TaskSpec] = []
+
+    async def execute(self, task_spec: TaskSpec) -> AgentResult:
+        self.tasks.append(task_spec)
+        return await AdapterRunner(self.adapter, runs_root=self.runs_root).execute(task_spec)
 
 
 @asynccontextmanager
 async def web_client(
-    tmp_path: Path, *, max_upload_bytes: int = 1_000_000
+    tmp_path: Path,
+    *,
+    max_upload_bytes: int = 1_000_000,
+    autonomous_executor: RecordingExecutor | None = None,
+    enable_all_forced: bool = False,
 ) -> AsyncIterator[tuple[httpx.AsyncClient, HunterRuntime]]:
     runs = tmp_path / "runs"
     kong = MockAdapter()
     kong.agent_id = "kong"
     trudi = MockAdapter()
     trudi.agent_id = "trudi"
-    supervisor = AnalysisSupervisor(kong_adapter=kong, trudi_adapter=trudi, runs_root=runs)
+    pentest = MockAdapter()
+    pentest.agent_id = "pentest-debug"
+    vulnerability = MockAdapter()
+    vulnerability.agent_id = "vulnerability-debug"
+    supervisor = AnalysisSupervisor(
+        kong_adapter=kong,
+        trudi_adapter=trudi,
+        runs_root=runs,
+        additional_adapters=(
+            {
+                "pentest": pentest,
+                "vulnerability_research": vulnerability,
+            }
+            if enable_all_forced
+            else None
+        ),
+    )
     runtime = HunterRuntime(
         WebConfig(
             project_root=Path(__file__).resolve().parents[2],
@@ -34,6 +66,7 @@ async def web_client(
             worker_count=1,
         ),
         supervisor=supervisor,
+        autonomous_executor=autonomous_executor,
     )
     transport = httpx.ASGITransport(app=create_app(runtime))
     async with httpx.AsyncClient(transport=transport, base_url="http://hunter.test") as client:
@@ -45,6 +78,63 @@ async def upload(client: httpx.AsyncClient, name: str, content: bytes) -> httpx.
     return await client.post(
         "/api/tasks", files={"file": (name, content, "application/x-untrusted")}
     )
+
+
+@pytest.mark.asyncio
+async def test_autonomous_mode_reaches_injected_hunter_brain_executor(
+    tmp_path: Path,
+) -> None:
+    runs = tmp_path / "runs"
+    brain_adapter = MockAdapter()
+    brain_adapter.agent_id = "hunter-brain"
+    executor = RecordingExecutor(brain_adapter, runs)
+    async with web_client(tmp_path, autonomous_executor=executor) as (client, runtime):
+        response = await client.post(
+            "/api/tasks",
+            data={"mode": "autonomous", "goal": "Correlate every relevant domain."},
+            files={"file": ("sample.log", b"event=login\n", "application/octet-stream")},
+        )
+        task_id = response.json()["task_id"]
+        runtime.wait_for_idle(task_id)
+        task = (await client.get(f"/api/tasks/{task_id}")).json()
+
+        assert response.status_code == 202
+        assert task["execution_mode"] == "autonomous"
+        assert task["backend"] == "hunter-brain"
+        assert executor.tasks[0].goal == "Correlate every relevant domain."
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("mode", "domain", "agent_id"),
+    (
+        ("force_dfir", "dfir", "trudi"),
+        ("force_reverse", "reverse", "kong"),
+        ("force_pentest", "pentest", "pentest-debug"),
+        (
+            "force_vulnerability_research",
+            "vulnerability_research",
+            "vulnerability-debug",
+        ),
+    ),
+)
+async def test_forced_professional_debug_modes_remain_available(
+    tmp_path: Path, mode: str, domain: str, agent_id: str
+) -> None:
+    async with web_client(tmp_path, enable_all_forced=True) as (client, runtime):
+        response = await client.post(
+            "/api/tasks",
+            data={"mode": mode},
+            files={"file": ("sample.log", b"event=login\n", "application/octet-stream")},
+        )
+        task_id = response.json()["task_id"]
+        runtime.wait_for_idle(task_id)
+        task = (await client.get(f"/api/tasks/{task_id}")).json()
+        result = (await client.get(f"/api/tasks/{task_id}/result")).json()
+
+        assert task["execution_mode"] == mode
+        assert task["domain"] == domain
+        assert result["agent_id"] == agent_id
 
 
 def compile_benign_elf(tmp_path: Path) -> bytes:

@@ -1,0 +1,75 @@
+{
+  "schema_version": "1.1",
+  "generated_at": "2026-08-31T09:40:00+08:00",
+  "credential_material_included": false,
+  "environment": {
+    "isolated_python": "third_party/fuzzingbrain/.venv/bin/python",
+    "mongodb": "healthy at 127.0.0.1:27018",
+    "redis": "healthy at 127.0.0.1:6380",
+    "docker_server": "29.1.3",
+    "oss_fuzz_base_builder": "sha256:510c387e0992584c290d92db5c2951f9bd6579f51cb513cab478e38622924fb5",
+    "destructive_docker_configuration": false
+  },
+  "deepseek_evidence": "artifacts/fuzzingbrain/deepseek-smoke.json",
+  "adapter": {
+    "implementation": "integrations/fuzzingbrain",
+    "registered_capability": "vulnerability_research",
+    "default_composition": true,
+    "isolated_child_process": true,
+    "path_confinement": true,
+    "artifact_hashing": true,
+    "mongodb_task_and_pov_collection": true,
+    "controlled_termination": true,
+    "fixture_workspace_support": true,
+    "filesystem_pov_fallback": "pymongo-unavailable safe; filesystem results/ is authoritative"
+  },
+  "fixed_target_fixtures": {
+    "vulnerable": "third_party/fuzzingbrain/fixtures/hunterdemo",
+    "fixed": "third_party/fuzzingbrain/fixtures/hunterdemo_fixed",
+    "bug": "length-prefixed memcpy without capacity check in hunter_parse (src/parser.c:47)",
+    "deterministic_trigger": "0x11000000 + 17 payload bytes -> ASan heap-buffer-overflow WRITE of size 17"
+  },
+  "verification": {
+    "hunter_integration_tests": "113 passed, 10 skipped (non-live); 2 live FuzzingBrain tests additionally run behind HUNTER_FUZZINGBRAIN_LIVE=1",
+    "fuzzingbrain_upstream_tests": "passed (275)",
+    "launcher_help": "passed",
+    "git_diff_check": "passed"
+  },
+  "live_case": {
+    "reproducible_pov": {
+      "status": "verified",
+      "run": "fuzzingbrain local mode, project=hunterdemo, sanitizer=address, task-type=pov-patch",
+      "result": "task completed, 1 POV activated, vuln_type=heap-buffer-overflow, llm_cost=$0.0936 over 28 calls",
+      "pov_artifact": "results/povs/pov_*/pov.bin = 0x11000000 + 17 bytes",
+      "independent_reproduction": "pov.bin run through gcr.io/oss-fuzz/hunterdemo /fuzzers/parser_fuzzer -> AddressSanitizer heap-buffer-overflow, WRITE of size 17, at hunter_parse src/parser.c:47"
+    },
+    "no_finding_or_failure_path": {
+      "status": "verified",
+      "run": "fuzzingbrain local mode, project=hunterdemo_fixed (bounds check added), 7 minute timeout",
+      "result": "0 POVs, FuzzerMonitor stopped monitoring with 0 total crashes, clean timeout shutdown, llm_cost=$0.0743 over 18 calls"
+    },
+    "adapter_layer3_live": {
+      "status": "verified",
+      "test": "integrations/fuzzingbrain/tests/test_fuzzingbrain_adapter_live.py (HUNTER_FUZZINGBRAIN_LIVE=1)",
+      "result": "TaskSpec -> FuzzingBrainAdapter -> real FuzzingBrain -> AgentResult SUCCESS: 'FuzzingBrain produced 9 reproducible vulnerability trigger(s)', 9 hashed trigger_sample artifacts, evidence + findings reached HunterWorldState",
+      "wall_seconds": 328
+    },
+    "layer4_global_brain_live": {
+      "status": "verified",
+      "test": "integrations/fuzzingbrain/tests/test_fuzzingbrain_layer4_live.py (HUNTER_FUZZINGBRAIN_LIVE=1)",
+      "result": "HunterOrchestrator + capability catalog dynamically selected vulnerability_research for the unresolved trigger question; real FuzzingBrain ran, trigger_sample reached world state; brain replanned and handed the trigger_sample artifact to reverse; completed with all decisions in hunter_brain_audit.jsonl",
+      "dispatch_chain": ["vulnerability_research -> input-source", "reverse -> child-<digest>-fuzzingbrain-trigger_sample-0"],
+      "wall_seconds": 281
+    },
+    "cross_domain_catalog": {
+      "status": "verified",
+      "test": "integrations/fuzzingbrain/tests/test_fuzzingbrain_cross_domain.py",
+      "result": "all six FuzzingBrain pairs route through the capability catalog (TRUDI->FB, Kong->FB, FB->Kong, FB->Pentest, Pentest->FB) and all four backends are dynamically selectable"
+    },
+    "orchestrator_directory_input": {
+      "status": "verified",
+      "result": "hunter_brain/orchestrator.py now stages source_tree/code_directory inputs (copytree + content digest), closing the gap where the catalog advertised directory inputs the brain could not route"
+    },
+    "reason": "Fixed deterministic local OSS-Fuzz targets are committed under third_party/fuzzingbrain/fixtures and executed against the real backend with DeepSeek."
+  }
+}

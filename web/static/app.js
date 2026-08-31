@@ -19,6 +19,8 @@ async function uploadPage() {
   const label = document.querySelector("#file-label");
   const button = document.querySelector("#submit-button");
   const error = document.querySelector("#upload-error");
+  const mode = document.querySelector("#mode-input");
+  const goal = document.querySelector("#goal-input");
   input.addEventListener("change", () => { label.textContent = input.files[0]?.name || "选择一个文件"; });
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -28,6 +30,8 @@ async function uploadPage() {
     error.classList.add("hidden");
     const body = new FormData();
     body.append("file", input.files[0]);
+    body.append("mode", mode.value);
+    if (goal.value.trim()) body.append("goal", goal.value.trim());
     try {
       const response = await fetch("/api/tasks", { method: "POST", body });
       const payload = await response.json();
@@ -60,6 +64,7 @@ function renderTask(task) {
   addInfo(info, "SHA-256", task.sha256);
   addInfo(info, "自动识别领域", task.domain);
   addInfo(info, "专业后端", task.backend || "尚未接入");
+  addInfo(info, "执行模式", task.execution_mode);
   addInfo(info, "Task ID", task.task_id);
   addInfo(info, "当前状态", task.status);
   addInfo(info, "当前阶段", task.stage);

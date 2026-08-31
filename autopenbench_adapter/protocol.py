@@ -6,15 +6,23 @@ import asyncio
 import json
 import os
 import shutil
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
+from hunter_brain.handoffs import HandoffCarrier, HandoffDescriptor
 from pentestgpt_agent.protocol.adapter import (
     AdapterExecutionError,
     HealthcheckResult,
     PreparedTask,
 )
-from pentestgpt_agent.protocol.contracts import ErrorCategory, ErrorDetail, TaskSpec
+from pentestgpt_agent.protocol.contracts import (
+    Artifact,
+    ErrorCategory,
+    ErrorDetail,
+    Finding,
+    TaskSpec,
+)
 from pentestgpt_agent.protocol.layout import RunLayout
 from pentestgpt_agent.protocol.manifest import AgentManifest, ManifestMode
 from pentestgpt_agent.protocol.subprocess_adapter import SubprocessAdapter
@@ -218,3 +226,47 @@ class AutoPenBenchProtocolAdapter(SubprocessAdapter):
                 code="AUTOPENBENCH_SCOPE_MISMATCH",
             )
         return await super().prepare(task_spec, run_layout)
+
+    async def collect(self, prepared: PreparedTask, handle: Any) -> Any:
+        """Expose the real benchmark evaluation as a generic DFIR-consumable handoff."""
+        result = await super().collect(prepared, handle)
+        backend = next(
+            (artifact for artifact in result.artifacts if artifact.artifact_id == "backend-result"),
+            None,
+        )
+        evidence = next(
+            (item for item in result.evidence if item.artifact_ref == "backend-result"),
+            None,
+        )
+        if backend is None or evidence is None:
+            return result
+        descriptor = HandoffDescriptor(
+            semantic_type="evidence_bundle",
+            carrier=HandoffCarrier.FILE,
+            values=(),
+            source_task_id=prepared.task_spec.task_id,
+            source_evidence_refs=(evidence.evidence_id,),
+        )
+        handoff = Artifact(
+            "pentest-evidence-handoff",
+            descriptor.semantic_type,
+            backend.path,
+            backend.sha256,
+            backend.size,
+            descriptor.to_metadata(),
+            self.agent_id,
+        )
+        handoff.validate()
+        finding = Finding(
+            "pentest-evaluation",
+            "target_proof",
+            "PentestGPT AutoPenBench evaluation",
+            result.summary,
+            evidence_refs=(evidence.evidence_id,),
+            metadata={"execution_status": result.status.value},
+        )
+        return replace(
+            result,
+            artifacts=(*result.artifacts, handoff),
+            findings=(*result.findings, finding),
+        )

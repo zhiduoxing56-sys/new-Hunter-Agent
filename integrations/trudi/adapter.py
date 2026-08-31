@@ -62,7 +62,7 @@ class TrudiAdapter(AgentAdapter):
         self.manifest = AgentManifest.load(Path(__file__).with_name("manifest.json"))
         self.executable = self.repo_root / self.manifest.start[0]
         self.runner = self.repo_root / self.manifest.start[1]
-        self.server = self.repo_root / self.manifest.start[3]
+        self.server = Path(__file__).with_name("lite_server.py")
         self.full_runner = Path(__file__).with_name("full_runner.py")
         self.full_server = Path(__file__).with_name("full_server.py")
         self.claude = self.repo_root / ".runtime" / "claude-code" / "node_modules" / ".bin" / "claude"
@@ -87,8 +87,14 @@ class TrudiAdapter(AgentAdapter):
             if missing:
                 return _unavailable(ErrorCategory.DEPENDENCY_ERROR, f"TRUDI runtime files are unavailable: {', '.join(missing)}", "TRUDI_RUNTIME")
             probe = await asyncio.create_subprocess_exec(
-                str(self.executable), "-c", "import asyncio, server; print(len(asyncio.run(server.mcp.list_tools())))",
-                cwd=self.server.parent,
+                str(self.executable),
+                "-c",
+                (
+                    "import asyncio, runpy; "
+                    f"scope=runpy.run_path({str(self.server)!r}); "
+                    "print(len(asyncio.run(scope['mcp'].list_tools())))"
+                ),
+                cwd=self.repo_root,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -236,11 +242,11 @@ class TrudiAdapter(AgentAdapter):
             status=ExecutionStatus.SUCCESS,
             started_at=context.started_at,
             finished_at=utc_now(),
-            summary="TRUDI completed real MCP-based hash, stat, and strings triage of the evidence file.",
+            summary="TRUDI completed real hash, stat, and strings triage of the evidence file.",
             findings=(finding,),
             evidence=evidence,
             artifacts=tuple(artifacts),
-            metrics={"wall_seconds": elapsed, "tool_calls": 4, "reasoning_backend_used": False},
+            metrics={"wall_seconds": elapsed, "tool_calls": 3, "reasoning_backend_used": False},
             raw_output={"returncode": returncode, "stdout_log": str(context.stdout_path), "stderr_log": str(context.stderr_path), "trudi": value},
         )
 

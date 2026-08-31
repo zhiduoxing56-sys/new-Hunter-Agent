@@ -12,7 +12,7 @@ from typing import Annotated
 from urllib.parse import quote
 
 import uvicorn
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
@@ -97,7 +97,10 @@ def create_app(runtime: HunterRuntime | None = None) -> FastAPI:
 
     @application.post("/api/tasks", status_code=202)
     async def create_task(
-        request: Request, file: Annotated[UploadFile, File()]
+        request: Request,
+        file: Annotated[UploadFile, File()],
+        mode: Annotated[str, Form()] = "automatic",
+        goal: Annotated[str | None, Form()] = None,
     ) -> dict[str, str]:
         if not file.filename:
             raise HTTPException(
@@ -155,6 +158,8 @@ def create_app(runtime: HunterRuntime | None = None) -> FastAPI:
                 staging_path,
                 original_filename=_display_filename(file.filename),
                 upload_size=size,
+                execution_mode=mode,
+                goal=goal,
             )
             owned_runtime.submit(spec)
             return {
@@ -167,6 +172,11 @@ def create_app(runtime: HunterRuntime | None = None) -> FastAPI:
         except IntakeError as exc:
             raise HTTPException(
                 status_code=422, detail={"code": exc.code.value, "message": str(exc)}
+            ) from exc
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=422,
+                detail={"code": "EXECUTION_MODE_INVALID", "message": str(exc)},
             ) from exc
         except Exception as exc:
             raise HTTPException(

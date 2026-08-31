@@ -8,3 +8,6 @@
 [submodule "third_party/trudi"]
 	path = third_party/trudi
 	url = https://github.com/nebulae/trudi.git
+[submodule "third_party/fuzzingbrain"]
+	path = third_party/fuzzingbrain
+	url = https://github.com/o2lab/FuzzingBrain-V2.git

@@ -8,12 +8,15 @@ import os
 import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
+from typing import Protocol
 
 from integrations.analysis_supervisor import AnalysisSupervisor
+from integrations.hunter_brain import build_analysis_brain_executor
 from integrations.kong import KongAdapter
 from integrations.trudi import TrudiAdapter
 
@@ -21,6 +24,28 @@ from pentestgpt_agent.identifiers import validate_opaque_id
 from pentestgpt_agent.intake import IntakeLimits, prepare_task
 from pentestgpt_agent.protocol import AgentResult, ExecutionStatus, RunLayout, TaskSpec
 from pentestgpt_agent.protocol.io import atomic_write_json, read_json_object
+
+
+EXECUTION_MODES = frozenset(
+    {
+        "automatic",
+        "autonomous",
+        "force_dfir",
+        "force_reverse",
+        "force_pentest",
+        "force_vulnerability_research",
+    }
+)
+FORCED_DOMAINS = {
+    "force_dfir": "dfir",
+    "force_reverse": "reverse",
+    "force_pentest": "pentest",
+    "force_vulnerability_research": "vulnerability_research",
+}
+
+
+class WebTaskExecutor(Protocol):
+    async def execute(self, task_spec: TaskSpec) -> AgentResult: ...
 
 
 def utc_now() -> str:
@@ -69,6 +94,7 @@ class HunterRuntime:
         config: WebConfig | None = None,
         *,
         supervisor: AnalysisSupervisor | None = None,
+        autonomous_executor: WebTaskExecutor | None = None,
     ) -> None:
         self.config = config or WebConfig.from_environment()
         self.config.ensure()
@@ -77,6 +103,17 @@ class HunterRuntime:
             trudi_adapter=TrudiAdapter(repo_root=self.config.project_root),
             runs_root=self.config.runs_root,
         )
+        self.autonomous_executor: WebTaskExecutor | None
+        if autonomous_executor is not None:
+            self.autonomous_executor = autonomous_executor
+        else:
+            try:
+                self.autonomous_executor = build_analysis_brain_executor(
+                    repo_root=self.config.project_root,
+                    runs_root=self.config.runs_root,
+                )
+            except ValueError:
+                self.autonomous_executor = None
         self._executor = ThreadPoolExecutor(
             max_workers=self.config.worker_count, thread_name_prefix="hunter-analysis"
         )
@@ -84,8 +121,16 @@ class HunterRuntime:
         self._lock = threading.Lock()
 
     def prepare_upload(
-        self, staging_path: Path, *, original_filename: str, upload_size: int
+        self,
+        staging_path: Path,
+        *,
+        original_filename: str,
+        upload_size: int,
+        execution_mode: str = "automatic",
+        goal: str | None = None,
     ) -> TaskSpec:
+        if execution_mode not in EXECUTION_MODES:
+            raise ValueError(f"unsupported execution mode: {execution_mode}")
         task_id = f"web-{uuid.uuid4().hex}"
         spec = prepare_task(
             staging_path,
@@ -94,12 +139,19 @@ class HunterRuntime:
             task_id=task_id,
             limits=IntakeLimits(max_input_bytes=self.config.max_upload_bytes),
         )
+        metadata = {**spec.metadata, "hunter_execution_mode": execution_mode}
+        domain = FORCED_DOMAINS.get(execution_mode, spec.domain)
+        spec = replace(spec, domain=domain, goal=goal.strip() if goal and goal.strip() else spec.goal, metadata=metadata)
+        spec.validate()
+        assert spec.workspace is not None
+        atomic_write_json(Path(spec.workspace) / "task.json", spec.to_dict())
         self._write_web_metadata(
             spec,
             {
                 "original_filename": original_filename,
                 "upload_size_bytes": upload_size,
                 "accepted_at": utc_now(),
+                "execution_mode": execution_mode,
             },
         )
         self._write_status(spec.task_id, "queued", stage="analysis_queued")
@@ -128,7 +180,8 @@ class HunterRuntime:
             raise
 
     def _execute_sync(self, task_spec: TaskSpec) -> None:
-        backend = backend_for_domain(task_spec.domain)
+        mode = str(task_spec.metadata.get("hunter_execution_mode", "automatic"))
+        backend = "hunter_brain" if mode == "autonomous" else backend_for_domain(task_spec.domain)
         self._write_status(
             task_spec.task_id,
             "running",
@@ -136,7 +189,12 @@ class HunterRuntime:
             backend=backend,
         )
         try:
-            result = asyncio.run(self.supervisor.execute(task_spec))
+            if mode == "autonomous":
+                if self.autonomous_executor is None:
+                    raise RuntimeError("autonomous Hunter Brain executor is not configured")
+                result = asyncio.run(self.autonomous_executor.execute(task_spec))
+            else:
+                result = asyncio.run(self.supervisor.execute(task_spec))
             status = status_from_result(result)
             self._write_status(
                 task_spec.task_id,
@@ -172,6 +230,9 @@ class HunterRuntime:
             "status": status["status"],
             "stage": status.get("stage"),
             "backend": status.get("backend") or backend_for_domain(task.domain),
+            "execution_mode": web_metadata.get(
+                "execution_mode", task.metadata.get("hunter_execution_mode", "automatic")
+            ),
             "domain": task.domain,
             "original_filename": web_metadata.get(
                 "original_filename",

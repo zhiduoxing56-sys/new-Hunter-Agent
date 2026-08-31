@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO
 
+from hunter_brain.handoffs import HandoffCarrier, HandoffDescriptor
 from pentestgpt_agent.protocol import (
     AgentAdapter,
     AgentManifest,
@@ -200,6 +201,22 @@ class KongAdapter(AgentAdapter):
             "Raw output from Kong's official info command backed by Ghidra.",
             artifact_ref=artifact.artifact_id,
         )
+        handoff = HandoffDescriptor(
+            semantic_type="evidence_bundle",
+            carrier=HandoffCarrier.FILE,
+            values=(),
+            source_task_id=prepared.task_spec.task_id,
+            source_evidence_refs=(evidence.evidence_id,),
+        )
+        evidence_handoff = Artifact(
+            "kong-info-evidence-handoff",
+            handoff.semantic_type,
+            artifact.path,
+            artifact.sha256,
+            artifact.size,
+            handoff.to_metadata(),
+            self.agent_id,
+        )
         finding = Finding(
             "kong-binary-metadata",
             "binary_metadata",
@@ -218,7 +235,7 @@ class KongAdapter(AgentAdapter):
             summary="Kong completed real Ghidra-backed binary metadata analysis.",
             findings=(finding,),
             evidence=(evidence,),
-            artifacts=(artifact,),
+            artifacts=(artifact, evidence_handoff),
             metrics={"wall_seconds": elapsed, "functions": parsed["functions"], "mode": "info"},
             raw_output={"returncode": returncode, "stdout_log": str(context.stdout_path), "stderr_log": str(context.stderr_path), "kong_info": parsed},
         )
@@ -233,6 +250,24 @@ class KongAdapter(AgentAdapter):
         if source_path.is_file():
             artifacts.append(Artifact.from_path("kong-decompiled-source", "decompiled_source", source_path, producer=self.agent_id))
         evidence = analysis_evidence("kong-analysis")
+        handoff = HandoffDescriptor(
+            semantic_type="evidence_bundle",
+            carrier=HandoffCarrier.FILE,
+            values=(),
+            source_task_id=prepared.task_spec.task_id,
+            source_evidence_refs=(evidence.evidence_id,),
+        )
+        artifacts.append(
+            Artifact(
+                "kong-evidence-handoff",
+                handoff.semantic_type,
+                artifacts[0].path,
+                artifacts[0].sha256,
+                artifacts[0].size,
+                handoff.to_metadata(),
+                self.agent_id,
+            )
+        )
         stats = analysis["stats"]
         functions = findings_from_analysis(analysis, evidence_id=evidence.evidence_id)
         return AgentResult(

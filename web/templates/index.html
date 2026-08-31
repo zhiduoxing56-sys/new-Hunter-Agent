@@ -11,7 +11,7 @@
     <header class="hero">
       <p class="eyebrow">SECURITY ANALYSIS</p>
       <h1>Hunter-Agent</h1>
-      <p class="lede">上传证据文件，由 Hunter 自动识别类型和领域，并路由到 Kong 或 TRUDI。</p>
+      <p class="lede">上传证据并选择自主总脑或专业后端调试入口。</p>
     </header>
     <section class="panel upload-panel">
       <form id="upload-form">
@@ -21,6 +21,17 @@
           <small>当前支持 Reverse（Kong）与轻量 DFIR（TRUDI）</small>
         </label>
         <input id="file-input" name="file" type="file" required>
+        <label for="goal-input">任务目标</label>
+        <textarea id="goal-input" name="goal" rows="3" placeholder="说明希望 Hunter 最终回答什么"></textarea>
+        <label for="mode-input">执行模式</label>
+        <select id="mode-input" name="mode">
+          <option value="autonomous">自主模式（Hunter 总脑）</option>
+          <option value="automatic">自动分类（兼容入口）</option>
+          <option value="force_dfir">强制取证</option>
+          <option value="force_reverse">强制逆向</option>
+          <option value="force_pentest">强制渗透</option>
+          <option value="force_vulnerability_research">强制漏洞挖掘</option>
+        </select>
         <button id="submit-button" type="submit">开始分析</button>
       </form>
       <div id="upload-error" class="error-box hidden" role="alert"></div>

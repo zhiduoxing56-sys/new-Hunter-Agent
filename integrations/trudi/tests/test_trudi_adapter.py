@@ -399,7 +399,8 @@ async def test_live_healthcheck_and_mcp_lifecycle_produce_valid_agent_result(
 
     health = await adapter.healthcheck(task)
     assert health.available is True
-    assert int(health.details["tool_count"]) >= 200
+    assert int(health.details["tool_count"]) == 4
+    assert health.details["scope"] == "lightweight_file_triage"
     result = await AdapterRunner(adapter, runs_root=tmp_path / "runs").execute(task)
 
     assert result.status is ExecutionStatus.SUCCESS

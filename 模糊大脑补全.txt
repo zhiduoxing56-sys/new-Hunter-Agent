@@ -1,0 +1,17 @@
+看完了两个计划文档和当前代码状态。结论：模糊大脑六阶段已经基本闭环，真正还差的集中在"真实跨域端到端"和"Offensive Supervisor / Semgrep"两块。
+已完成（本次新增确认）
+- 阶段三真实案例：可复现 PoV + 无漏洞路径都跑通 ✅
+- 阶段四 FuzzingBrainAdapter：代码完整（真实子进程 runner、统一密钥注入、results/解析、artifact 哈希、错误映射），5 项单测过 ✅
+- 阶段五注册：build_hunter_brain_adapters 里已注册为 vulnerability_research 默认适配器 ✅
+- 109 passed / 8 skipped 确认无回归 ✅
+还差什么
+1. 真实跨域端到端（最大缺口） — 就是那 8 个被跳过的测试，全部需要真实外部后端：
+- TRUDI→Kong 真实配对（HUNTER_ANALYSIS_PAIR_LIVE）
+- TRUDI Layer 3（HUNTER_TRUDI_SMOKE_EVIDENCE）
+- Kong Layer 3 / 跨适配器真实（HUNTER_KONG_LAYER3_LIVE、HUNTER_KONG_SMOKE_BINARY）
+- 三后端真实 Layer 4（HUNTER_THREE_BACKEND_LIVE）—— 且只含 Pentest/TRUDI/Kong，不含 FuzzingBrain
+2. FuzzingBrain 跨域真实闭环缺失：FuzzingBrain→Pentest、Pentest→FuzzingBrain、FuzzingBrain→Kong 这些两两跨域只有假适配器/mock 测试，FuzzingBrain 从没进过真实跨域测试。Adapter 本身也还没有"TaskSpec→Adapter→真实 fuzzingbrain→AgentResult"的 Layer 3 实测（我这次是直接用 launcher 跑的，没走 Adapter 层）。
+3. Offensive Supervisor 没实现（全局方案 §29-6）：设计要求两个领域子监督器，现在只有 Analysis Supervisor + 全局 Supervisor，渗透+漏洞挖掘侧没有独立子监督器。
+4. SemgrepAdapter 完全没做（全局方案 §29-4）：Semgrep 定位是跨域静态代码工具 + 漏洞挖掘前置筛选器，代码里搜不到。
+5. 交付收尾：更新 implementation-audit.json 的 live_case、把 fixture 挪出被 gitignore 的 workspace/ 作为交付物、固化并提交 client.py 的 DeepSeek 路由补丁和 launcher 的 PATH 补丁。
+其中 1、2 受"真实外部后端"条件约束（Kong 需要 JDK21+Ghidra+推理服务，TRUDI full 依赖 Claude Code runtime），3、4 是纯工程缺口。要我从哪个开始？
