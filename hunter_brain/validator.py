@@ -54,6 +54,7 @@ class ValidationCode(StrEnum):
     SCOPE_VIOLATION = "scope_violation"
     DUPLICATE_CALL = "duplicate_call"
     NO_PROGRESS_LOOP = "no_progress_loop"
+    BACKEND_REPEATED_FAILURE = "backend_repeated_failure"
     SUCCESS_CONDITION_MISSING = "success_condition_missing"
     SUCCESS_CONDITION_UNKNOWN = "success_condition_unknown"
     CRITICAL_QUESTION_UNRESOLVED = "critical_question_unresolved"
@@ -113,12 +114,15 @@ class BudgetSnapshot:
 class ValidatorPolicy:
     max_consecutive_no_progress: int = 3
     critical_question_priority: int = 80
+    max_repeated_backend_failure: int = 2
 
     def __post_init__(self) -> None:
         if self.max_consecutive_no_progress < 1:
             raise ValueError("max_consecutive_no_progress must be positive")
         if not 0 <= self.critical_question_priority <= 100:
             raise ValueError("critical_question_priority must be between 0 and 100")
+        if self.max_repeated_backend_failure < 1:
+            raise ValueError("max_repeated_backend_failure must be positive")
 
 
 class DeterministicDecisionValidator:
@@ -236,6 +240,17 @@ class DeterministicDecisionValidator:
                 ValidationIssue(
                     ValidationCode.DUPLICATE_CALL,
                     "The same capability, inputs, and question already made no progress.",
+                )
+            )
+        repeated_failures = self._repeated_backend_failure(decision, state)
+        if repeated_failures >= self.policy.max_repeated_backend_failure:
+            issues.append(
+                ValidationIssue(
+                    ValidationCode.BACKEND_REPEATED_FAILURE,
+                    (
+                        f"The same backend action already failed/timed out "
+                        f"{repeated_failures} times without new evidence."
+                    ),
                 )
             )
         if self._trailing_no_progress(state) >= self.policy.max_consecutive_no_progress:
@@ -472,6 +487,40 @@ class DeterministicDecisionValidator:
     def _trailing_no_progress(state: HunterWorldState) -> int:
         count = 0
         for record in reversed(state.dispatch_history):
+            if (
+                record.new_evidence
+                or record.new_facts
+                or record.new_artifacts
+                or record.answered_question_ids
+            ):
+                break
+            count += 1
+        return count
+
+    @staticmethod
+    def _repeated_backend_failure(
+        decision: InvokeCapabilityDecision, state: HunterWorldState
+    ) -> int:
+        """Count consecutive timeout/failed dispatches of the same equivalent
+        backend action with no new canonical evidence. The supervisor must not
+        blindly reschedule such an action; it needs a new basis, a legal
+        alternative, or an honest BLOCKED decision.
+        """
+        count = 0
+        for record in reversed(state.dispatch_history):
+            if record.capability_id != decision.capability_id:
+                break
+            if record.input_refs != decision.input_refs:
+                break
+            same_question = (
+                record.question_id == decision.question_id
+                if record.question_id is not None
+                else record.objective == decision.objective
+            )
+            if not same_question:
+                break
+            if record.status not in {"timeout", "failed"}:
+                break
             if (
                 record.new_evidence
                 or record.new_facts

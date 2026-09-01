@@ -10,6 +10,7 @@ BRAIN_ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_MODULES = {
     "capabilities.py",
     "completion_truth.py",
+    "contract_ingress.py",
     "decisions.py",
     "handoffs.py",
     "invocation_bridge.py",

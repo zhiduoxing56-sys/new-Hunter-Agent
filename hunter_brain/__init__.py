@@ -11,6 +11,12 @@ from .capabilities import (
     CapabilityCost,
     default_catalog,
 )
+from .contract_ingress import (
+    DecisionIngressPolicy,
+    DecisionNormalizationError,
+    decision_fingerprint,
+    normalize_decision_json,
+)
 from .decisions import (
     DECISION_SCHEMA_VERSION,
     BlockedDecision,
@@ -45,6 +51,7 @@ from .state import (
 )
 from .supervisor import (
     SYSTEM_INSTRUCTIONS,
+    DecisionAttemptTrace,
     DecisionModel,
     DeepSeekDecisionModel,
     DeepSeekSupervisorConfig,
@@ -53,6 +60,7 @@ from .supervisor import (
     SupervisionOutcome,
     SupervisorConfigurationError,
     SupervisorContextLimits,
+    SupervisorDecisionRejected,
     SupervisorModelError,
     SupervisorOutputError,
 )
@@ -89,6 +97,10 @@ __all__ = (
     "Capability",
     "CapabilityCatalog",
     "CapabilityCost",
+    "DecisionIngressPolicy",
+    "DecisionNormalizationError",
+    "decision_fingerprint",
+    "normalize_decision_json",
     "DECISION_SCHEMA_VERSION",
     "BlockedDecision",
     "CompleteDecision",
@@ -116,6 +128,7 @@ __all__ = (
     "UnresolvedQuestion",
     "VerifiedFact",
     "SYSTEM_INSTRUCTIONS",
+    "DecisionAttemptTrace",
     "DecisionModel",
     "DeepSeekDecisionModel",
     "DeepSeekSupervisorConfig",
@@ -124,6 +137,7 @@ __all__ = (
     "SupervisionOutcome",
     "SupervisorConfigurationError",
     "SupervisorContextLimits",
+    "SupervisorDecisionRejected",
     "SupervisorModelError",
     "SupervisorOutputError",
     "QuestionResolution",

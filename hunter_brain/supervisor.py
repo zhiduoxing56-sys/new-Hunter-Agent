@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from collections.abc import Mapping
@@ -12,6 +13,12 @@ import httpx
 from pentestgpt_agent.protocol import TaskSpec
 
 from .capabilities import CapabilityCatalog
+from .contract_ingress import (
+    DecisionIngressPolicy,
+    DecisionNormalizationError,
+    decision_fingerprint,
+    normalize_decision_json,
+)
 from .decisions import SupervisorDecision, VerificationCheck, decision_from_dict
 from .state import HunterWorldState
 from .validator import (
@@ -60,11 +67,57 @@ class SupervisorOutputError(ValueError):
     pass
 
 
+class SupervisorDecisionRejected(SupervisorOutputError):
+    """Bounded decision-ingress retry exhausted or repeated an identical
+    invalid/no-progress proposal. Carries the exact per-attempt trace so the
+    caller can audit raw outputs, normalization, errors, and retry indices.
+    """
+
+    def __init__(
+        self,
+        *,
+        code: str,
+        message: str,
+        traces: tuple["DecisionAttemptTrace", ...],
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.rejection_message = message
+        self.traces = traces
+
+
+@dataclass(frozen=True)
+class DecisionAttemptTrace:
+    """One auditable attempt of the decision ingress pipeline."""
+
+    attempt_index: int
+    raw_output: str
+    normalized: dict[str, Any] | None
+    parse_error: str | None
+    validation_issues: tuple[dict[str, Any], ...]
+    fingerprint: str
+    accepted: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "attempt_index": self.attempt_index,
+            "raw_output": self.raw_output,
+            "normalized": self.normalized,
+            "parse_error": self.parse_error,
+            "validation_issues": [
+                dict(issue) for issue in self.validation_issues
+            ],
+            "fingerprint": self.fingerprint,
+            "accepted": self.accepted,
+        }
+
+
 @dataclass(frozen=True)
 class ModelDecisionResult:
-    value: dict[str, Any]
+    value: dict[str, Any] | None
     usage: dict[str, Any]
     request_id: str | None = None
+    raw_content: str = ""
 
 
 class DecisionModel(Protocol):
@@ -181,13 +234,20 @@ class DeepSeekDecisionModel:
         try:
             body = response.json()
             content = body["choices"][0]["message"]["content"]
-            value = json.loads(content)
-        except (KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
+        except (KeyError, IndexError, TypeError) as exc:
             raise SupervisorOutputError(
-                "DeepSeek supervisor response did not contain a JSON decision"
+                "DeepSeek supervisor response did not contain a text decision"
             ) from exc
+        if not isinstance(content, str):
+            raise SupervisorOutputError(
+                "DeepSeek supervisor decision content is not text"
+            )
+        try:
+            value = json.loads(content)
+        except (TypeError, json.JSONDecodeError):
+            value = None
         if not isinstance(value, dict):
-            raise SupervisorOutputError("DeepSeek supervisor decision must be a JSON object")
+            value = None
         usage = body.get("usage", {})
         if not isinstance(usage, dict):
             usage = {}
@@ -195,6 +255,7 @@ class DeepSeekDecisionModel:
             value=value,
             usage=usage,
             request_id=response.headers.get("x-request-id"),
+            raw_content=content,
         )
 
 
@@ -217,6 +278,7 @@ class SupervisionOutcome:
     validation: DecisionValidation
     model_usage: dict[str, Any]
     request_id: str | None = None
+    traces: tuple[DecisionAttemptTrace, ...] = ()
 
 
 class HunterSupervisor:
@@ -227,11 +289,13 @@ class HunterSupervisor:
         catalog: CapabilityCatalog,
         validator: DeterministicDecisionValidator | None = None,
         context_limits: SupervisorContextLimits | None = None,
+        ingress_policy: DecisionIngressPolicy | None = None,
     ) -> None:
         self.model = model
         self.catalog = catalog
         self.validator = validator or DeterministicDecisionValidator()
         self.context_limits = context_limits or SupervisorContextLimits()
+        self.ingress_policy = ingress_policy or DecisionIngressPolicy()
 
     async def decide(
         self,
@@ -240,28 +304,153 @@ class HunterSupervisor:
         state: HunterWorldState,
         budget: BudgetSnapshot,
     ) -> SupervisionOutcome:
-        context = self.build_context(task=task, state=state, budget=budget)
-        model_result = await self.model.decide(
-            system_instructions=SYSTEM_INSTRUCTIONS,
-            context=context,
+        base_context = self.build_context(task=task, state=state, budget=budget)
+        state_revision = _state_revision(state)
+        base_usage: dict[str, Any] = {}
+        traces: list[DecisionAttemptTrace] = []
+        last_fingerprint: str | None = None
+        consecutive_repeats = 0
+        for attempt in range(self.ingress_policy.max_attempts):
+            previous = traces[-1] if traces else None
+            context = self._attempt_context(base_context, attempt, previous, state_revision)
+            model_result = await self.model.decide(
+                system_instructions=SYSTEM_INSTRUCTIONS,
+                context=context,
+            )
+            _merge_usage(base_usage, model_result.usage)
+            raw = model_result.raw_content or ""
+            normalized: dict[str, Any] | None = model_result.value
+            parse_error: str | None = None
+            if normalized is None:
+                try:
+                    normalized = normalize_decision_json(raw)
+                except DecisionNormalizationError as exc:
+                    parse_error = str(exc)
+            fingerprint = decision_fingerprint(normalized, raw=raw)
+            if fingerprint == last_fingerprint:
+                consecutive_repeats += 1
+            else:
+                consecutive_repeats = 1
+            last_fingerprint = fingerprint
+            if normalized is None:
+                traces.append(
+                    DecisionAttemptTrace(
+                        attempt, raw, None, parse_error, (), fingerprint, False
+                    )
+                )
+                if consecutive_repeats >= self.ingress_policy.max_repeated_invalid:
+                    raise SupervisorDecisionRejected(
+                        code="repeated_invalid_decision",
+                        message=(
+                            "The supervisor repeated the same invalid output "
+                            f"{consecutive_repeats} times: {parse_error}"
+                        ),
+                        traces=tuple(traces),
+                    )
+                continue
+            try:
+                decision = decision_from_dict(normalized)
+            except ValueError as exc:
+                traces.append(
+                    DecisionAttemptTrace(
+                        attempt,
+                        raw,
+                        normalized,
+                        f"invalid structured supervisor decision: {exc}",
+                        (),
+                        fingerprint,
+                        False,
+                    )
+                )
+                if consecutive_repeats >= self.ingress_policy.max_repeated_invalid:
+                    raise SupervisorDecisionRejected(
+                        code="repeated_invalid_decision",
+                        message=(
+                            "The supervisor repeated an identical invalid "
+                            f"decision {consecutive_repeats} times: {exc}"
+                        ),
+                        traces=tuple(traces),
+                    )
+                continue
+            validation = self.validator.validate(
+                decision,
+                task=task,
+                state=state,
+                catalog=self.catalog,
+                budget=budget,
+            )
+            issues = tuple(
+                {
+                    "code": issue.code.value,
+                    "message": issue.message,
+                    "reference": issue.reference,
+                }
+                for issue in validation.issues
+            )
+            traces.append(
+                DecisionAttemptTrace(
+                    attempt, raw, normalized, None, issues, fingerprint, validation.accepted
+                )
+            )
+            if validation.accepted:
+                return SupervisionOutcome(
+                    decision,
+                    validation,
+                    base_usage,
+                    model_result.request_id,
+                    tuple(traces),
+                )
+            if consecutive_repeats >= self.ingress_policy.max_repeated_invalid:
+                codes = {issue["code"] for issue in issues}
+                raise SupervisorDecisionRejected(
+                    code="repeated_no_progress_decision",
+                    message=(
+                        "The supervisor repeated an identical rejected decision "
+                        f"{consecutive_repeats} times (codes={sorted(codes)})."
+                    ),
+                    traces=tuple(traces),
+                )
+        last_trace = traces[-1] if traces else None
+        raise SupervisorDecisionRejected(
+            code="invalid_decision_exhausted",
+            message=(
+                "Supervisor decision ingress exhausted "
+                f"{self.ingress_policy.max_attempts} attempts without an accepted decision."
+            ),
+            traces=tuple(traces),
+        ) if last_trace is not None else SupervisorDecisionRejected(
+            code="invalid_decision_exhausted",
+            message="Supervisor decision ingress produced no decision attempt.",
+            traces=(),
         )
-        try:
-            decision = decision_from_dict(model_result.value)
-        except ValueError as exc:
-            raise SupervisorOutputError(f"invalid structured supervisor decision: {exc}") from exc
-        validation = self.validator.validate(
-            decision,
-            task=task,
-            state=state,
-            catalog=self.catalog,
-            budget=budget,
-        )
-        return SupervisionOutcome(
-            decision=decision,
-            validation=validation,
-            model_usage=model_result.usage,
-            request_id=model_result.request_id,
-        )
+
+    def _attempt_context(
+        self,
+        base_context: dict[str, Any],
+        attempt: int,
+        previous: DecisionAttemptTrace | None,
+        state_revision: str,
+    ) -> dict[str, Any]:
+        if attempt == 0 or previous is None:
+            return base_context
+        errors: list[dict[str, Any]] = []
+        if previous.parse_error is not None:
+            errors.append({"stage": "parse", "error": previous.parse_error})
+        errors.extend(dict(issue) for issue in previous.validation_issues)
+        context = dict(base_context)
+        context["decision_retry"] = {
+            "retry_index": attempt,
+            "state_revision": state_revision,
+            "instruction": (
+                "Your previous decision was rejected. Output exactly one "
+                "corrected decision JSON object. Do not repeat the rejected "
+                "decision. Use only identifiers and vocabulary present in this "
+                "context. If no valid action is possible, output a genuine "
+                "blocked decision."
+            ),
+            "previous_decision_errors": errors,
+        }
+        return context
 
     def build_context(
         self,
@@ -412,3 +601,24 @@ class HunterSupervisor:
             ],
             "evidence_ids": list(state.evidence)[-max_artifacts:],
         }
+
+
+def _state_revision(state: HunterWorldState) -> str:
+    """Stable fingerprint of the canonical world state for retry prompts.
+
+    A retry never mutates canonical state, so the revision is constant across
+    attempts of one decision; the model can rely on it.
+    """
+    payload = json.dumps(state.to_dict(), ensure_ascii=False, sort_keys=True)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
+def _merge_usage(accumulator: dict[str, Any], usage: dict[str, Any]) -> None:
+    """Aggregate token/cost usage across bounded ingress retry attempts."""
+    if not isinstance(usage, dict):
+        return
+    for key, value in usage.items():
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            accumulator[key] = accumulator.get(key, 0) + value
+        elif key not in accumulator:
+            accumulator[key] = value

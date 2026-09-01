@@ -17,10 +17,10 @@ from hunter_brain.supervisor import (
     ModelDecisionResult,
     SupervisorConfigurationError,
     SupervisorContextLimits,
+    SupervisorDecisionRejected,
     SupervisorModelError,
-    SupervisorOutputError,
 )
-from hunter_brain.validator import BudgetSnapshot, ValidationCode
+from hunter_brain.validator import BudgetSnapshot
 from pentestgpt_agent.protocol import (
     AuthorizationScope,
     InputObject,
@@ -166,7 +166,7 @@ async def test_invalid_model_contract_is_rejected_before_validation() -> None:
         catalog=default_catalog(),
     )
 
-    with pytest.raises(SupervisorOutputError, match="invalid structured"):
+    with pytest.raises(SupervisorDecisionRejected, match="repeated"):
         await supervisor.decide(
             task=_task(),
             state=_state(),
@@ -181,14 +181,21 @@ async def test_structured_but_forged_model_reference_is_returned_as_rejected() -
         catalog=default_catalog(),
     )
 
-    outcome = await supervisor.decide(
-        task=_task(),
-        state=_state(),
-        budget=BudgetSnapshot(decisions_remaining=2, capability_calls_remaining=2),
-    )
+    with pytest.raises(SupervisorDecisionRejected) as exc_info:
+        await supervisor.decide(
+            task=_task(),
+            state=_state(),
+            budget=BudgetSnapshot(decisions_remaining=2, capability_calls_remaining=2),
+        )
 
-    assert outcome.validation.accepted is False
-    assert ValidationCode.UNKNOWN_INPUT in {item.code for item in outcome.validation.issues}
+    assert exc_info.value.code == "repeated_no_progress_decision"
+    rejected_traces = [t for t in exc_info.value.traces if not t.accepted]
+    assert rejected_traces
+    assert any(
+        issue.get("code") == "unknown_input"
+        for trace in rejected_traces
+        for issue in trace.validation_issues
+    )
 
 
 def test_deepseek_config_supports_existing_hunter_environment_without_leaking_key() -> None:
@@ -263,5 +270,6 @@ async def test_deepseek_client_maps_provider_and_output_failures() -> None:
 
     with pytest.raises(SupervisorModelError, match="authentication"):
         await auth_model.decide(system_instructions="test", context={})
-    with pytest.raises(SupervisorOutputError, match="JSON decision"):
-        await invalid_model.decide(system_instructions="test", context={})
+    invalid_result = await invalid_model.decide(system_instructions="test", context={})
+    assert invalid_result.value is None
+    assert invalid_result.raw_content == "not-json"

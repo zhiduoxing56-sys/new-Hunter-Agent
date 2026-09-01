@@ -98,13 +98,16 @@ class CapturingModel:
     def __init__(self, inner: Any) -> None:
         self.inner = inner
         self.decisions: list[dict] = []
+        self.raw_outputs: list[str] = []
         self.usage: list[dict] = []
 
     async def decide(self, *, system_instructions: str, context: dict) -> Any:
         result = await self.inner.decide(
             system_instructions=system_instructions, context=context
         )
-        self.decisions.append(dict(result.value))
+        if result.value is not None:
+            self.decisions.append(dict(result.value))
+        self.raw_outputs.append(result.raw_content or "")
         if isinstance(result.usage, dict):
             self.usage.append(result.usage)
         return result
@@ -349,7 +352,8 @@ async def _run_one(case: dict, runs_root: Path) -> dict:
         rec["completion_truth"] = result.raw_output.get("completion_truth")
         rec["terminal_decision"] = result.raw_output.get("terminal_decision")
         rec["terminal_error"] = result.error.to_dict() if result.error else None
-        rec["supervisor_decisions"] = capturer.decisions
+        rec["supervisor_decisions"] = _accepted_decisions(runs_root, run_id)
+        rec["raw_model_outputs"] = capturer.raw_outputs
         world = result.raw_output.get("world_state") or {}
         rec["dispatch"] = world.get("dispatch_history")
         rec["canonical_facts"] = len(world.get("facts", []))
@@ -376,6 +380,7 @@ async def _run_one(case: dict, runs_root: Path) -> dict:
                 rec["benchmark_judge_success"] = False
         rec["cross_domain_handoff_count"] = max(len(rec["dispatch"]) - 1, 0) if rec["dispatch"] else 0
         rec["classification"] = classify(case, rec)
+        rec["decision_ingress"] = _decision_ingress_metrics(runs_root, run_id, capturer)
     except Exception as exc:  # pragma: no cover - defensive
         rec["error"] = f"{type(exc).__name__}: {exc}"
         rec["classification"] = {"category": "ENVIRONMENT_FAILURE", "reason": str(exc)}
@@ -385,6 +390,76 @@ async def _run_one(case: dict, runs_root: Path) -> dict:
         with (RESULTS_ROOT / f"{case['case_id']}.jsonl").open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(rec, ensure_ascii=False, default=str) + "\n")
     return rec
+
+
+def _accepted_decisions(runs_root: Path, run_id: str) -> list[dict[str, Any]]:
+    """The supervisor's accepted decisions, from the orchestrator audit.
+
+    Raw model outputs (including rejected ingress attempts) are never treated
+    as accepted decisions; only outcomes the orchestrator committed appear here.
+    """
+    accepted: list[dict[str, Any]] = []
+    audit_path = runs_root / run_id / "hunter_brain_audit.jsonl"
+    if not audit_path.is_file():
+        return accepted
+    for line in audit_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if event.get("event_type") == "decision" and event.get("payload", {}).get("accepted"):
+            accepted.append(event["payload"].get("decision") or {})
+    return accepted
+
+
+def _decision_ingress_metrics(runs_root: Path, run_id: str, capturer: CapturingModel) -> dict[str, Any]:
+    """Summarize the bounded contract-ingress retry from the audit trace."""
+    attempts: list[dict[str, Any]] = []
+    rejected: list[dict[str, Any]] = []
+    accepted_decision_count = 0
+    audit_path = runs_root / run_id / "hunter_brain_audit.jsonl"
+    if audit_path.is_file():
+        for line in audit_path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            event_type = event.get("event_type")
+            if event_type == "decision_attempt":
+                attempts.append(event.get("payload") or {})
+            elif event_type == "supervisor_decision_rejected":
+                rejected.append(event.get("payload") or {})
+            elif event_type == "decision" and event.get("payload", {}).get("accepted"):
+                accepted_decision_count += 1
+    grouped: dict[int, list[dict[str, Any]]] = {}
+    for attempt in attempts:
+        grouped.setdefault(attempt.get("decision_index") or 0, []).append(attempt)
+    decisions_with_rejection = sum(
+        1
+        for group in grouped.values()
+        if any(not item.get("accepted") for item in group)
+    )
+    retries_recovered = sum(
+        1
+        for group in grouped.values()
+        if any(not item.get("accepted") for item in group)
+        and any(item.get("accepted") for item in group)
+    )
+    raw_invalid = sum(1 for attempt in attempts if not attempt.get("accepted"))
+    return {
+        "raw_model_calls": len(capturer.raw_outputs),
+        "accepted_decisions": accepted_decision_count,
+        "ingress_attempts": len(attempts),
+        "rejected_attempts": raw_invalid,
+        "decisions_with_rejection": decisions_with_rejection,
+        "retries_recovered": retries_recovered,
+        "supervisor_decision_rejections": rejected,
+        "attempt_trace": attempts,
+    }
 
 
 def classify(case: dict, rec: dict) -> dict[str, Any]:

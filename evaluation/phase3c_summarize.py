@@ -78,6 +78,15 @@ def main() -> None:
         reason = (rec.get("classification") or {}).get("reason") or "completion_verifier_rejected"
         rejection_reasons.setdefault(reason, []).append(rec["run_id"])
 
+    raw_calls = sum((r.get("decision_ingress") or {}).get("raw_model_calls", 0) for r in eligible)
+    raw_invalid = sum((r.get("decision_ingress") or {}).get("rejected_attempts", 0) for r in eligible)
+    accepted = sum((r.get("decision_ingress") or {}).get("accepted_decisions", 0) for r in eligible)
+    decisions_with_rejection = sum((r.get("decision_ingress") or {}).get("decisions_with_rejection", 0) for r in eligible)
+    retries_recovered = sum((r.get("decision_ingress") or {}).get("retries_recovered", 0) for r in eligible)
+    run_level_invalid_termination = [
+        r for r in eligible if r.get("orchestration_status") == "invalid_decisions"
+    ]
+
     def rate(count: int, total: int) -> float:
         return round(100.0 * count / total, 1) if total else 0.0
 
@@ -163,6 +172,21 @@ def main() -> None:
                 "count": len(verifier_rejections),
                 "eligible_total": len(eligible),
                 "reasons": {reason: {"count": len(ids), "run_ids": ids} for reason, ids in sorted(rejection_reasons.items())},
+            },
+            "decision_ingress_reliability": {
+                "raw_model_calls": raw_calls,
+                "raw_invalid_attempts": raw_invalid,
+                "accepted_decisions": accepted,
+                "raw_invalid_rate": rate(raw_invalid, raw_calls) if raw_calls else 0.0,
+                "decisions_with_rejection": decisions_with_rejection,
+                "retries_recovered": retries_recovered,
+                "retry_recovery_rate": rate(retries_recovered, decisions_with_rejection) if decisions_with_rejection else None,
+                "run_level_invalid_decisions_termination_rate": {
+                    "count": len(run_level_invalid_termination),
+                    "total": len(eligible),
+                    "rate": rate(len(run_level_invalid_termination), len(eligible)),
+                    "run_ids": [r["run_id"] for r in run_level_invalid_termination],
+                },
             },
         },
         "per_domain": per_domain,

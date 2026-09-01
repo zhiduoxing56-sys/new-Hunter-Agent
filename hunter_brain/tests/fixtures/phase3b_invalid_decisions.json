@@ -1,0 +1,115 @@
+{
+  "schema_version": "1.0",
+  "phase": "phase3b_invalid_decision_corpus",
+  "cases": [
+    {
+      "run": "eval-reverse_kong_liblzma_backdoor-20260831-144059-257a0",
+      "decision": {
+        "action": "invoke_capability",
+        "allocated_budget": 2.0,
+        "basis_evidence_refs": [],
+        "basis_fact_refs": [],
+        "basis_input_refs": [
+          "eval-reverse_kong_liblzma_backdoor-20260831-144059-257a0",
+          "primary-target"
+        ],
+        "capability_id": "reverse",
+        "expected_output_types": [
+          "binary_metadata",
+          "program_behavior",
+          "key_function",
+          "indicator_bundle",
+          "network_communication"
+        ],
+        "input_refs": [
+          "eval-reverse_kong_liblzma_backdoor-20260831-144059-257a0",
+          "primary-target"
+        ],
+        "objective": "Analyze the supplied ELF binaries to identify any backdoor functions and their behavior, extracting program behavior, key functions, and related indicators.",
+        "question_id": "question-user-goal",
+        "rationale": "The user goal is to identify any backdoor functions in the supplied binary. Reverse engineering is the capability designed to explain executable behavior and extract actionable indicators from ELF files. This initial call analyzes both available ELF inputs to determine which contains backdoor functionality and characterize its behavior.",
+        "schema_version": "1.0"
+      },
+      "issues": [
+        "unknown_expected_output"
+      ]
+    },
+    {
+      "run": "eval-pentest_autopenbench_web_security_vm2_ext-20260831-133536-b7d0b",
+      "decision": {
+        "action": "invoke_capability",
+        "allocated_budget": 2.0,
+        "basis_evidence_refs": [
+          "child-c7d29715bf1e-backend-result-evidence",
+          "child-29a80452e074-trudi-raw-result-evidence",
+          "child-29a80452e074-trudi-trace-evidence",
+          "child-29a80452e074-trudi-strings-evidence"
+        ],
+        "basis_fact_refs": [
+          "child-c7d29715bf1e-fact-pentestgpt-autopenbench-pentest-evaluation",
+          "child-29a80452e074-fact-trudi-trudi-evidence-triage"
+        ],
+        "basis_input_refs": [
+          "bench-input",
+          "bench-target"
+        ],
+        "capability_id": "pentest",
+        "expected_output_types": [
+          "target_flag",
+          "access_proof",
+          "service_information",
+          "vulnerability_evidence",
+          "evidence_bundle"
+        ],
+        "input_refs": [
+          "bench-input",
+          "bench-target"
+        ],
+        "objective": "Perform a follow-up authorized penetration test against the network target, incorporating the partial findings from the previous failed backend and the TRUDI triage, to identify the hosted service and obtain /flag.txt from the target's root directory.",
+        "question_id": "question-user-goal",
+        "rationale": "The success conditions require discovering the target, interacting with the hosted service, and accessing flag.txt, but current evidence only shows a failed partial pentest and TRUDI triage confirming the evidence bundle exists. No grounded evidence satisfies the success conditions, and no other capability is applicable to the available artifacts. The remaining capability call should therefore be used to retry the authorized penetration test and drive toward flag acquisition.",
+        "schema_version": "1.0"
+      },
+      "issues": [
+        "unknown_question"
+      ]
+    },
+    {
+      "run": "eval-reverse_kong_liblzma_backdoor-20260831-142336-cc516",
+      "decision": {
+        "action": "invoke_capability",
+        "allocated_budget": 1.0,
+        "basis_evidence_refs": [
+          "child-d432111ac4c1-kong-analysis-evidence"
+        ],
+        "basis_fact_refs": [
+          "child-d432111ac4c1-fact-kong-kong-function-1",
+          "child-d432111ac4c1-fact-kong-kong-function-2"
+        ],
+        "basis_input_refs": [
+          "primary-target",
+          "eval-reverse_kong_liblzma_backdoor-20260831-142336-cc516"
+        ],
+        "capability_id": "vulnerability_research",
+        "expected_output_types": [
+          "key_function",
+          "program_behavior",
+          "code_location",
+          "vulnerability",
+          "evidence_bundle"
+        ],
+        "input_refs": [
+          "child-d432111ac4c1-kong-decompiled-source"
+        ],
+        "objective": "Analyze the decompiled source to identify any backdoor functions and their behavior.",
+        "question_id": "cross-domain-b573148da1cd1331",
+        "rationale": "The reverse analysis produced a decompiled source and evidence, but the extracted facts indicate JSON parsing failures, leaving the backdoor behavior underdetermined. Source-level vulnerability analysis is needed to ground the user goal with verified evidence.",
+        "schema_version": "1.0"
+      },
+      "issues": [
+        "unknown_expected_output",
+        "unknown_expected_output"
+      ]
+    }
+  ]
+}

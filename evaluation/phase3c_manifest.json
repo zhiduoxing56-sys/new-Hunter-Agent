@@ -45,6 +45,12 @@
     ],
     "generic_gate": "no oracle: every success condition must cite evidence referenced by a canonical VerifiedFact"
   },
+  "phase3d_a_ingress": {
+    "status": "applied on top of phase3c",
+    "summary": "Supervisor decision contract ingress (hunter_brain/contract_ingress.py): deterministic normalization + bounded retry-with-feedback + duplicate fingerprint early-stop + backend repeated-failure gate. CompletionVerifier/oracles/verdicts unchanged.",
+    "policy": {"max_attempts": 3, "max_repeated_invalid": 2, "max_repeated_backend_failure": 2},
+    "report": "HUNTER_SUPERVISOR_CONTRACT_RELIABILITY_REPORT.md"
+  },
   "benchmark_evidence": {
     "reverse_liblzma_backdoor": {
       "file": ".runtime/eval-artifacts/reverse/extracted/usr/lib/x86_64-linux-gnu/liblzma.so.5.6.1",

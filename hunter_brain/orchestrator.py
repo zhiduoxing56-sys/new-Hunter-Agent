@@ -40,6 +40,7 @@ from .state_updater import (
 )
 from .supervisor import (
     SupervisionOutcome,
+    SupervisorDecisionRejected,
     SupervisorModelError,
     SupervisorOutputError,
 )
@@ -225,6 +226,19 @@ class HunterOrchestrator:
                     state=state,
                     budget=ledger.snapshot(),
                 )
+            except SupervisorDecisionRejected as exc:
+                for trace in exc.traces:
+                    audit.append("decision_attempt", trace.to_dict())
+                audit.append(
+                    "supervisor_decision_rejected",
+                    {"code": exc.code, "message": exc.rejection_message},
+                )
+                return OrchestrationResult(
+                    OrchestrationStatus.INVALID_DECISIONS,
+                    state,
+                    ledger.snapshot(),
+                    message=f"{exc.code}: {exc.rejection_message}",
+                )
             except (SupervisorModelError, SupervisorOutputError) as exc:
                 audit.append("supervisor_error", {"error": f"{type(exc).__name__}: {exc}"})
                 return OrchestrationResult(
@@ -234,6 +248,11 @@ class HunterOrchestrator:
                     message=str(exc),
                 )
             ledger.record_decision(outcome)
+            decision_index = ledger.decisions_used
+            for trace in outcome.traces:
+                payload = trace.to_dict()
+                payload["decision_index"] = decision_index
+                audit.append("decision_attempt", payload)
             audit.append(
                 "decision",
                 {
