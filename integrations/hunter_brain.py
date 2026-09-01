@@ -129,6 +129,11 @@ class HunterBrainTaskExecutor:
             raw_output={
                 "orchestration_status": outcome.status.value,
                 "terminal_decision": terminal.to_dict() if terminal else None,
+                "completion_truth": (
+                    outcome.completion_truth.to_dict()
+                    if outcome.completion_truth is not None
+                    else None
+                ),
                 "world_state": outcome.state.to_dict(),
             },
         )

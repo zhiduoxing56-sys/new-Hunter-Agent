@@ -10,6 +10,11 @@ from typing import Any, Protocol
 
 from pentestgpt_agent.protocol import AgentResult, RunLayout, TaskSpec
 
+from .completion_truth import (
+    CompletionTruth,
+    CompletionTruthVerifier,
+    CompletionVerdict,
+)
 from .decisions import CompleteDecision, VerificationCheck, VerifyDecision
 from .state import HunterWorldState
 from .state_updater import QuestionResolution
@@ -38,6 +43,10 @@ class VerificationCode(StrEnum):
     SEMANTIC_REFERENCE_INVALID = "semantic_reference_invalid"
     CONFLICTING_FACTS = "conflicting_facts"
     CHECK_UNSUPPORTED = "check_unsupported"
+    GOAL_NOT_VERIFIED = "goal_not_verified"
+    GOAL_EVIDENCE_INSUFFICIENT = "goal_evidence_insufficient"
+    GOAL_INCONCLUSIVE = "goal_inconclusive"
+    ORACLE_UNAVAILABLE = "oracle_unavailable"
 
 
 @dataclass(frozen=True)
@@ -89,6 +98,7 @@ class GlobalVerificationOutcome:
     issues: tuple[VerificationIssue, ...] = ()
     resolutions: tuple[QuestionResolution, ...] = ()
     semantic_rationale: str | None = None
+    completion_truth: CompletionTruth | None = None
 
     @property
     def passed(self) -> bool:
@@ -101,11 +111,15 @@ class GlobalVerifier:
         *,
         semantic_model: SemanticVerificationModel | None = None,
         critical_question_priority: int = 80,
+        completion_truth_verifier: CompletionTruthVerifier | None = None,
     ) -> None:
         if not 0 <= critical_question_priority <= 100:
             raise ValueError("critical_question_priority must be between 0 and 100")
         self.semantic_model = semantic_model
         self.critical_question_priority = critical_question_priority
+        self.completion_truth_verifier = (
+            completion_truth_verifier or CompletionTruthVerifier()
+        )
 
     async def verify_result(
         self,
@@ -327,6 +341,48 @@ class GlobalVerifier:
                 )
         if issues:
             return self._outcome(checks, issues)
+        truth = await self.completion_truth_verifier.determine(
+            task=task,
+            state=state,
+            decision=decision,
+        )
+        if truth.verdict is CompletionVerdict.NOT_VERIFIED:
+            issues.append(
+                VerificationIssue(
+                    VerificationCode.GOAL_NOT_VERIFIED,
+                    truth.message,
+                    truth.reason,
+                )
+            )
+            return self._outcome(checks, issues, completion_truth=truth)
+        if truth.verdict is CompletionVerdict.INCONCLUSIVE:
+            issues.append(
+                VerificationIssue(
+                    VerificationCode.GOAL_INCONCLUSIVE,
+                    truth.message,
+                    truth.reason,
+                )
+            )
+            return self._outcome(
+                checks,
+                issues,
+                completion_truth=truth,
+                inconclusive=True,
+            )
+        if truth.verdict is CompletionVerdict.UNAVAILABLE:
+            issues.append(
+                VerificationIssue(
+                    VerificationCode.ORACLE_UNAVAILABLE,
+                    truth.message,
+                    truth.reason,
+                )
+            )
+            return self._outcome(
+                checks,
+                issues,
+                completion_truth=truth,
+                inconclusive=True,
+            )
         return await self._with_semantics(
             kind="global_completion",
             objective=decision.summary,
@@ -336,6 +392,7 @@ class GlobalVerifier:
             checks=checks,
             issues=issues,
             semantic_required=False,
+            completion_truth=truth,
         )
 
     async def _with_semantics(
@@ -349,6 +406,7 @@ class GlobalVerifier:
         checks: list[DeterministicCheck],
         issues: list[VerificationIssue],
         semantic_required: bool,
+        completion_truth: CompletionTruth | None = None,
     ) -> GlobalVerificationOutcome:
         if self.semantic_model is None:
             if semantic_required:
@@ -358,8 +416,13 @@ class GlobalVerifier:
                         "Semantic verification was requested but no model is configured.",
                     )
                 )
-                return self._outcome(checks, issues, inconclusive=True)
-            return self._outcome(checks, issues)
+                return self._outcome(
+                    checks,
+                    issues,
+                    inconclusive=True,
+                    completion_truth=completion_truth,
+                )
+            return self._outcome(checks, issues, completion_truth=completion_truth)
         assessment = await self.semantic_model.assess(
             SemanticVerificationRequest(
                 kind=kind,
@@ -400,12 +463,14 @@ class GlobalVerifier:
                 resolutions=assessment.resolutions,
                 semantic_rationale=assessment.rationale,
                 inconclusive=True,
+                completion_truth=completion_truth,
             )
         return self._outcome(
             checks,
             issues,
             resolutions=assessment.resolutions,
             semantic_rationale=assessment.rationale,
+            completion_truth=completion_truth,
         )
 
     @staticmethod
@@ -510,12 +575,9 @@ class GlobalVerifier:
         resolutions: tuple[QuestionResolution, ...] = (),
         semantic_rationale: str | None = None,
         inconclusive: bool = False,
+        completion_truth: CompletionTruth | None = None,
     ) -> GlobalVerificationOutcome:
-        if inconclusive and not any(
-            issue.code
-            not in {VerificationCode.SEMANTIC_MODEL_UNAVAILABLE}
-            for issue in issues
-        ):
+        if inconclusive:
             status = GlobalVerificationStatus.INCONCLUSIVE
         else:
             status = (
@@ -529,6 +591,7 @@ class GlobalVerifier:
             tuple(issues),
             resolutions if status is GlobalVerificationStatus.PASSED else (),
             semantic_rationale,
+            completion_truth,
         )
 
     @staticmethod

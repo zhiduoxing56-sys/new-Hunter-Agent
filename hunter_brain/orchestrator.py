@@ -44,7 +44,12 @@ from .supervisor import (
     SupervisorOutputError,
 )
 from .validator import BudgetSnapshot, resolve_input_type
-from .verifier import GlobalVerificationOutcome, GlobalVerificationStatus, GlobalVerifier
+from .verifier import (
+    GlobalVerificationOutcome,
+    GlobalVerificationStatus,
+    GlobalVerifier,
+)
+from .completion_truth import CompletionTruth
 
 
 AUDIT_FILENAME = "hunter_brain_audit.jsonl"
@@ -161,6 +166,7 @@ class OrchestrationResult:
     budget: BudgetSnapshot
     terminal_decision: SupervisorDecision | None = None
     message: str | None = None
+    completion_truth: CompletionTruth | None = None
 
 
 class CapabilityAdapterRegistry:
@@ -280,6 +286,7 @@ class HunterOrchestrator:
                             ledger.snapshot(),
                             decision,
                             "Global completion verification did not pass.",
+                            verification.completion_truth,
                         )
                 state.save(layout.root)
                 audit.append("completed", {"decision": decision.to_dict()})
@@ -288,6 +295,11 @@ class HunterOrchestrator:
                     state,
                     ledger.snapshot(),
                     decision,
+                    completion_truth=(
+                        verification.completion_truth
+                        if self.verifier is not None
+                        else None
+                    ),
                 )
             if isinstance(decision, BlockedDecision):
                 state.save(layout.root)
@@ -318,13 +330,16 @@ class HunterOrchestrator:
                             "Requested global verification failed.",
                         )
                     if verification.status is GlobalVerificationStatus.INCONCLUSIVE:
-                        return OrchestrationResult(
-                            OrchestrationStatus.VERIFICATION_REQUIRED,
-                            state,
-                            ledger.snapshot(),
-                            decision,
-                            "Requested global verification was inconclusive.",
+                        # No semantic verifier is configured (or the assessment
+                        # is genuinely unresolved). An inconclusive verify must
+                        # not permanently dead-end a run that may otherwise
+                        # complete through the completion-truth gate; let the
+                        # supervisor decide again within its bounded budget.
+                        audit.append(
+                            "verification_inconclusive",
+                            {"decision": decision.to_dict()},
                         )
+                        continue
                     for resolution in verification.resolutions:
                         state.resolve_question(
                             resolution.question_id,
@@ -511,6 +526,11 @@ class HunterOrchestrator:
             ],
             "resolved_questions": [item.question_id for item in outcome.resolutions],
             "semantic_rationale": outcome.semantic_rationale,
+            "completion_truth": (
+                outcome.completion_truth.to_dict()
+                if outcome.completion_truth is not None
+                else None
+            ),
         }
 
     @staticmethod

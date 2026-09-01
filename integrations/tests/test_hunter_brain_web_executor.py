@@ -56,6 +56,53 @@ class RecordingMockAdapter(MockAdapter):
         return await super().prepare(task_spec, run_layout)
 
 
+class CrashTriggerMockAdapter(RecordingMockAdapter):
+    """VR mock that reproduces a real crash ``trigger_sample`` artifact.
+
+    Phase 3C completion truth requires deterministic goal evidence for a
+    vulnerability-research completion: a reproduced trigger is that evidence.
+    A generic SUCCESS with only an output file is intentionally NOT a global
+    completion anymore.
+    """
+
+    async def collect(self, prepared: PreparedTask, handle) -> Any:
+        results = prepared.run_layout.artifacts / "fuzzingbrain-workspace" / "results" / "povs"
+        results.mkdir(parents=True, exist_ok=True)
+        trigger = results / "crash-1"
+        trigger.write_bytes(b"ASAN: heap-buffer-overflow\n")
+        from pentestgpt_agent.protocol import AgentResult, Artifact, Evidence, Finding
+
+        artifact = Artifact.from_path(
+            "fuzzingbrain-trigger-0", "trigger_sample", trigger, producer=self.agent_id
+        )
+        evidence = Evidence(
+            "fuzzingbrain-trigger-0-evidence",
+            "backend_output",
+            self.agent_id,
+            "FuzzingBrain reproduced a crash trigger.",
+            artifact_ref=artifact.artifact_id,
+        )
+        finding = Finding(
+            "fuzzingbrain-reproduced-vulnerability",
+            "vulnerability",
+            "Reproduced vulnerability trigger",
+            "The crash trigger demonstrates a reproducible vulnerability.",
+            evidence_refs=(evidence.evidence_id,),
+        )
+        return AgentResult(
+            task_id=prepared.task_spec.task_id,
+            agent_id=self.agent_id,
+            domain=prepared.task_spec.domain,
+            status=ExecutionStatus.SUCCESS,
+            started_at="2026-08-31T00:00:00+00:00",
+            finished_at="2026-08-31T00:00:01+00:00",
+            summary="FuzzingBrain produced a reproducible vulnerability trigger.",
+            findings=(finding,),
+            evidence=(evidence,),
+            artifacts=(artifact,),
+        )
+
+
 class ScriptedDecisionModel:
     """Return canned decision JSON, never calling an external model."""
 
@@ -352,7 +399,7 @@ async def test_web_autonomous_mode_dispatch_vulnerability_research(
 ) -> None:
     runs = tmp_path / "runs"
     runs.mkdir()
-    vulnerability = RecordingMockAdapter(agent_id="vulnerability-mock")
+    vulnerability = CrashTriggerMockAdapter(agent_id="vulnerability-mock")
     model = CompletingModel(
         _invoke_decision(
             "vulnerability_research",
@@ -445,8 +492,11 @@ async def test_web_autonomous_mode_reverse_call_still_passes(tmp_path: Path) -> 
     )
     result = await executor.execute(task)
 
-    assert result.raw_output["orchestration_status"] == "complete"
-    assert result.status is ExecutionStatus.SUCCESS
+    # Phase 3C: a generic reverse backend cannot complete globally without a
+    # benchmark oracle or verified goal evidence. Dispatch + evidence must still
+    # work; a false global COMPLETE must not.
+    assert result.raw_output["orchestration_status"] != "complete"
+    assert result.status is not ExecutionStatus.SUCCESS
     history = result.raw_output["world_state"]["dispatch_history"]
     assert history[0]["capability_id"] == "reverse"
     assert history[0]["new_evidence"] is True
@@ -534,7 +584,7 @@ async def test_web_autonomous_dispatch_vulnerability_research_for_source_zip(
     runs.mkdir()
     staging = tmp_path / "staging"
     staging.mkdir()
-    vulnerability = RecordingMockAdapter(agent_id="vulnerability-mock")
+    vulnerability = CrashTriggerMockAdapter(agent_id="vulnerability-mock")
     archive = staging / "src.zip"
     with zipfile.ZipFile(archive, "w") as bundle:
         bundle.writestr("project/pyproject.toml", "[project]\n")
@@ -576,7 +626,7 @@ async def test_web_autonomous_dispatch_vulnerability_research_for_project_direct
     runs.mkdir()
     staging = tmp_path / "staging"
     staging.mkdir()
-    vulnerability = RecordingMockAdapter(agent_id="vulnerability-mock")
+    vulnerability = CrashTriggerMockAdapter(agent_id="vulnerability-mock")
     project = staging / "proj"
     (project / "src").mkdir(parents=True)
     (project / "src" / "main.py").write_text("x = 1\n", encoding="utf-8")

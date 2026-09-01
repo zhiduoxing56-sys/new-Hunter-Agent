@@ -411,3 +411,93 @@ async def test_explicit_verify_action_passes_resolves_question_and_reenters_loop
     audit = (tmp_path / "runs" / task.task_id / AUDIT_FILENAME).read_text(encoding="utf-8")
     assert "verification_result" in audit
     assert "completion_verification" in audit
+
+
+class InconclusiveVerifyThenCompleteSupervisor:
+    """Issue a semantic-support verify (inconclusive without a semantic model),
+    then complete on the existing verified fact."""
+
+    def __init__(self, task: TaskSpec) -> None:
+        self.task = task
+        self.calls = 0
+        self.validator = DeterministicDecisionValidator()
+
+    async def decide(
+        self,
+        *,
+        task: TaskSpec,
+        state: HunterWorldState,
+        budget: BudgetSnapshot,
+    ) -> SupervisionOutcome:
+        decision: SupervisorDecision
+        if self.calls == 0:
+            decision = VerifyDecision(
+                "Verify that the fact answers the user question.",
+                ("evidence-existing",),
+                ("semantic_support",),
+                "A semantic answer check is still required.",
+            )
+        else:
+            decision = CompleteDecision(
+                "The existing fact satisfies the goal.",
+                {task.success_conditions[0]: ("evidence-existing",)},
+                "No critical questions remain.",
+            )
+        self.calls += 1
+        return SupervisionOutcome(
+            decision,
+            self.validator.validate(
+                decision,
+                task=task,
+                state=state,
+                catalog=default_catalog(),
+                budget=budget,
+            ),
+            {},
+        )
+
+
+@pytest.mark.asyncio
+async def test_inconclusive_semantic_verify_does_not_dead_end_the_run(
+    tmp_path: Path,
+) -> None:
+    target = "https://allowed.example/"
+    task = TaskSpec(
+        "verify-inconclusive-loop",
+        "pentest",
+        target,
+        "Verify the existing evidence and finish.",
+        success_conditions=("The existing conclusion is verified.",),
+        input_object=InputObject("input-network", "network_target", target),
+        authorization=AuthorizationScope(allowed_targets=(target,)),
+    )
+    state = HunterWorldState.from_task(task)
+    state.add_evidence(
+        EvidenceRecord(
+            "evidence-existing",
+            "observation",
+            "test-source",
+            "Existing grounded observation.",
+        )
+    )
+    state.add_fact(
+        VerifiedFact("fact-existing", "The observation is established.", ("evidence-existing",))
+    )
+    probe = ConcurrencyProbe()
+    supervisor = InconclusiveVerifyThenCompleteSupervisor(task)
+    orchestrator = HunterOrchestrator(
+        supervisor=supervisor,
+        adapters=CapabilityAdapterRegistry(
+            {"pentest": ProducingAdapter("unused", "text_report", probe)}
+        ),
+        runs_root=tmp_path / "runs",
+        verifier=GlobalVerifier(),
+    )
+
+    result = await orchestrator.run(task, initial_state=state)
+
+    assert result.status is OrchestrationStatus.COMPLETE
+    assert supervisor.calls == 2
+    audit = (tmp_path / "runs" / task.task_id / AUDIT_FILENAME).read_text(encoding="utf-8")
+    assert "verification_inconclusive" in audit
+    assert "completion_verification" in audit

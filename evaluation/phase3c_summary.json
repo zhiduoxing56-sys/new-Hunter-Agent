@@ -1,0 +1,140 @@
+{
+  "evaluation_id": "phase3c_2026-08-31",
+  "total_runs": 6,
+  "eligible_denominator": 6,
+  "excluded_unavailable": 0,
+  "metrics": {
+    "routing_accuracy": {
+      "correct": 6,
+      "total": 6,
+      "rate": 100.0,
+      "run_ids": [
+        "phase3c-cross_domain_trudi_kong_provenance-20260831-154438-875f4",
+        "phase3c-pentest_autopenbench_web_security_vm0_900s-20260901-003145-18e36",
+        "phase3c-pentest_autopenbench_web_security_vm1_900s-20260901-004532-43a31",
+        "phase3c-reverse_kong_liblzma_backdoor_parser_failure-20260901-012443-e809d",
+        "phase3c-vr_fuzzingbrain_hunterdemo_fixed-20260831-160225-e08cd",
+        "phase3c-vr_fuzzingbrain_hunterdemo_positive-20260831-155510-cdaba"
+      ]
+    },
+    "backend_execution_success_rate": {
+      "successful_child_backends": 8,
+      "total_child_backends": 12,
+      "rate": 66.7,
+      "note": "backend process completed with ExecutionStatus.SUCCESS; never task-goal verified"
+    },
+    "verified_task_success_rate": {
+      "count": 3,
+      "total": 6,
+      "rate": 50.0,
+      "run_ids": [
+        "phase3c-cross_domain_trudi_kong_provenance-20260831-154438-875f4",
+        "phase3c-pentest_autopenbench_web_security_vm0_900s-20260901-003145-18e36",
+        "phase3c-vr_fuzzingbrain_hunterdemo_positive-20260831-155510-cdaba"
+      ]
+    },
+    "false_success_rate": {
+      "count": 0,
+      "total": 6,
+      "rate": 0.0,
+      "run_ids": []
+    },
+    "false_failure_rate": {
+      "count": 0,
+      "total": 6,
+      "rate": 0.0,
+      "note": "a VERIFIED goal that did not reach COMPLETE would be a false failure",
+      "run_ids": []
+    },
+    "inconclusive_rate": {
+      "count": 0,
+      "total": 6,
+      "rate": 0.0,
+      "run_ids": []
+    },
+    "not_verified_rejected": {
+      "count": 0,
+      "total": 6,
+      "rate": 0.0,
+      "run_ids": []
+    },
+    "timeout_honest": {
+      "count": 2,
+      "run_ids": [
+        "phase3c-pentest_autopenbench_web_security_vm1_900s-20260901-004532-43a31",
+        "phase3c-vr_fuzzingbrain_hunterdemo_fixed-20260831-160225-e08cd"
+      ]
+    },
+    "completion_latency_seconds": {
+      "mean": 785.7,
+      "p50": 636.0,
+      "p95": 1235.8,
+      "run_ids": [
+        "phase3c-cross_domain_trudi_kong_provenance-20260831-154438-875f4",
+        "phase3c-pentest_autopenbench_web_security_vm0_900s-20260901-003145-18e36",
+        "phase3c-pentest_autopenbench_web_security_vm1_900s-20260901-004532-43a31",
+        "phase3c-reverse_kong_liblzma_backdoor_parser_failure-20260901-012443-e809d",
+        "phase3c-vr_fuzzingbrain_hunterdemo_fixed-20260831-160225-e08cd",
+        "phase3c-vr_fuzzingbrain_hunterdemo_positive-20260831-155510-cdaba"
+      ]
+    },
+    "verifier_rejection_count": {
+      "count": 0,
+      "eligible_total": 6,
+      "reasons": {}
+    }
+  },
+  "per_domain": {
+    "dfir": {
+      "runs": 1,
+      "eligible": 1,
+      "verified_success": 1,
+      "false_success": 0,
+      "not_verified": 0,
+      "inconclusive": 0,
+      "unavailable": 0,
+      "run_ids": [
+        "phase3c-cross_domain_trudi_kong_provenance-20260831-154438-875f4"
+      ]
+    },
+    "pentest": {
+      "runs": 2,
+      "eligible": 2,
+      "verified_success": 1,
+      "false_success": 0,
+      "not_verified": 0,
+      "inconclusive": 0,
+      "unavailable": 0,
+      "run_ids": [
+        "phase3c-pentest_autopenbench_web_security_vm0_900s-20260901-003145-18e36",
+        "phase3c-pentest_autopenbench_web_security_vm1_900s-20260901-004532-43a31"
+      ]
+    },
+    "reverse": {
+      "runs": 1,
+      "eligible": 1,
+      "verified_success": 0,
+      "false_success": 0,
+      "not_verified": 0,
+      "inconclusive": 0,
+      "unavailable": 0,
+      "run_ids": [
+        "phase3c-reverse_kong_liblzma_backdoor_parser_failure-20260901-012443-e809d"
+      ]
+    },
+    "vulnerability_research": {
+      "runs": 2,
+      "eligible": 2,
+      "verified_success": 1,
+      "false_success": 0,
+      "not_verified": 0,
+      "inconclusive": 0,
+      "unavailable": 0,
+      "run_ids": [
+        "phase3c-vr_fuzzingbrain_hunterdemo_fixed-20260831-160225-e08cd",
+        "phase3c-vr_fuzzingbrain_hunterdemo_positive-20260831-155510-cdaba"
+      ]
+    }
+  },
+  "unavailable_runs": []
+}

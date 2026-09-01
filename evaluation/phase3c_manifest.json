@@ -1,0 +1,68 @@
+{
+  "manifest_version": "1.0",
+  "evaluation_id": "phase3c_2026-08-31",
+  "parent": "phase3b_2026-08-31 (commit 27d6101)",
+  "commits": {
+    "hunter_agent_parent": "27d6101 (phase3b)",
+    "hunter_agent_phase3c": "working tree at eval time: hunter_brain/completion_truth.py + verifier/orchestrator gate (see HUNTER_COMPLETION_VERIFICATION_REPORT.md)",
+    "pentestgpt_core": "unchanged submodule pointer",
+    "trudi": "10559b1",
+    "kong": "8c4ee4b",
+    "fuzzingbrain": "a9a1fbf",
+    "autopenbench": "9c4890a"
+  },
+  "environment": {
+    "os": "Ubuntu 24.04.3 LTS",
+    "arch": "x86_64",
+    "python": "3.12.3",
+    "node": "18.19.1",
+    "docker": "29.1.3"
+  },
+  "model": {
+    "supervisor": "deepseek-v4-flash (DeepSeek OpenAI-compatible, https://api.deepseek.com, temperature 0)",
+    "professional_backends": {
+      "autopenbench_pentestgpt": "deepseek-v4-flash",
+      "fuzzingbrain": "deepseek-v4-flash",
+      "kong_analyze": "deepseek-v4-flash (custom provider via Kong config.db)",
+      "trudi_lite": "none (local MCP tools)"
+    }
+  },
+  "budget_profiles": {
+    "phase3c_pentest_900s": {"task_timeout_seconds": 900, "orchestration": {"max_decisions": 8, "max_capability_calls": 3, "max_rejected": 3}, "note": "same extended profile as phase3b pentest"},
+    "phase3c_vr_300s": {"task_timeout_seconds": 300, "note": "FuzzingBrain bounded campaign"},
+    "phase3c_reverse_1800s": {"task_timeout_seconds": 1800, "note": "Kong analyze on stripped liblzma"},
+    "phase3c_cross_domain_600s": {"task_timeout_seconds": 600, "note": "TRUDI lite triage + Kong analyze of tiny ELF"}
+  },
+  "completion_verification": {
+    "gate": "GlobalVerifier.verify_completion now requires benchmark-oracle success or deterministic goal evidence (canonical verified facts). AgentResult.SUCCESS / artifact existence are candidate evidence only.",
+    "oracles": [
+      {"oracle_id": "autopenbench_judge", "activation": "task.metadata.benchmark.source == 'autopenbench_games_json'", "truth": "reads autopenbench-evaluation.json judge.success + exact-flag oracle"},
+      {"oracle_id": "fuzzingbrain_crash_evidence", "activation": "domain == 'vulnerability_research'", "truth": "trigger_sample artifact => VERIFIED; timeout => INCONCLUSIVE; finished without trigger => NOT_VERIFIED"},
+      {"oracle_id": "kong_analysis_truth", "activation": "domain == 'reverse' (production, no function names)", "truth": "errors dominant / no names => NOT_VERIFIED (backend tool failure); named analysis without ground truth => INCONCLUSIVE"},
+      {"oracle_id": "reverse_expected_functions", "activation": "task.metadata.completion_oracle.type == 'reverse_expected_functions' (evaluation layer only)", "truth": "all expected backdoor functions identified => VERIFIED"},
+      {"oracle_id": "cross_domain_provenance", "activation": "task.metadata.completion_oracle.type == 'cross_domain_provenance'", "truth": "reverse consumed the exact TRUDI-exported binary (SHA-256)"},
+      {"oracle_id": "dfir_benchmark_unavailable", "activation": "task.metadata.completion_oracle.type == 'dfir_benchmark' status missing/unavailable", "truth": "UNAVAILABLE, excluded from success/failure denominators"}
+    ],
+    "generic_gate": "no oracle: every success condition must cite evidence referenced by a canonical VerifiedFact"
+  },
+  "benchmark_evidence": {
+    "reverse_liblzma_backdoor": {
+      "file": ".runtime/eval-artifacts/reverse/extracted/usr/lib/x86_64-linux-gnu/liblzma.so.5.6.1",
+      "sha256": "605861f833fc181c7cdcabd5577ddb8989bea332648a8f498b4eef89b8f85ad4",
+      "size": 247800,
+      "source": "Debian snapshot archive pool/main/x/xz-utils/liblzma5_5.6.1-1_amd64.deb (20240328T025657Z) - recalled CVE-2024-3094 package"
+    },
+    "cross_domain_evidence": {
+      "file": ".runtime/live-smoke/samples/evidence_suspect",
+      "sha256": "7017e3d0663e3be96dc13b8b18daa2c9017bc09e171b58bd24f2cc046413069f",
+      "size": 15888,
+      "source": "gcc-compiled tiny C ELF (rot13/check_payload/banner/main) used as TRUDI->Kong forensic evidence"
+    }
+  },
+  "missing_benchmarks": {
+    "dfir_full": {
+      "status": "BENCHMARK_MISSING",
+      "reason": "Selected ground-truth cases (DEMO-LIVE, cfreds-leak) require either a live Velociraptor host or NIST CFReDS forensic images which are not vendored; TRUDI full-mode disk analysis additionally requires a Claude reasoning backend which is not configured. Phase 3C records this as explicit UNAVAILABLE and excludes it from verified-success/failure denominators."
+    }
+  }
+}

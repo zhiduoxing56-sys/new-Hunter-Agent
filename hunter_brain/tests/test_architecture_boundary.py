@@ -9,6 +9,7 @@ from pathlib import Path
 BRAIN_ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_MODULES = {
     "capabilities.py",
+    "completion_truth.py",
     "decisions.py",
     "handoffs.py",
     "invocation_bridge.py",
