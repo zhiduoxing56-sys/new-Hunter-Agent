@@ -4,7 +4,7 @@
   "parent": "phase3d-b (commit f5524ab)",
   "commits": {
     "hunter_agent_parent_phase3db": "f5524ab",
-    "hunter_agent_phase3dc": "phase3d-c (see report)",
+    "hunter_agent_phase3dc": "150a9e0 (phase3d-c: DFIR runtime/environment & real-evidence availability closure)",
     "pentestgpt_core": "unchanged submodule pointer",
     "trudi": "10559b1",
     "kong": "8c4ee4b",
