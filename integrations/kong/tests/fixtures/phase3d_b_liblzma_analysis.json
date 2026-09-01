@@ -1,0 +1,56 @@
+{
+  "binary": {
+    "name": "00-liblzma.so.5.6.1",
+    "path": "/home/tenggn/projects/Hunter-Agent/.runtime/phase3c-runs/reverse/phase3c-reverse_kong_liblzma_backdoor_parser_failure-20260901-070324-e390f/hunter_brain_subtasks/phase3c-reverse_kong_liblzma_backdoor_parser_failure-20260901-070324-e390f-brain-0001/artifacts/input/00-liblzma.so.5.6.1",
+    "arch": "x86",
+    "format": "Executable and Linking Format (ELF)",
+    "endianness": "little",
+    "word_size": 8,
+    "compiler": "gcc"
+  },
+  "stats": {
+    "total_functions": 478,
+    "analyzed": 2,
+    "named": 0,
+    "renamed": 0,
+    "confirmed": 0,
+    "high_confidence": 0,
+    "medium_confidence": 0,
+    "low_confidence": 2,
+    "skipped": 31,
+    "errors": 445,
+    "llm_calls": 2,
+    "duration_seconds": 866.2118546962738,
+    "cost_usd": 0.0,
+    "cost_tracking": false
+  },
+  "functions": [
+    {
+      "address": "0x0010ea50",
+      "original_name": "FUN_0010ea50",
+      "name": "",
+      "signature": "",
+      "confidence": 0,
+      "classification": "",
+      "comments": "",
+      "reasoning": "Failed to parse LLM response as JSON: ",
+      "obfuscation_techniques": [
+        "cff",
+        "vmprotect"
+      ]
+    },
+    {
+      "address": "0x001158d0",
+      "original_name": "lzma_index_hash_decode",
+      "name": "",
+      "signature": "",
+      "confidence": 0,
+      "classification": "",
+      "comments": "",
+      "reasoning": "Failed to parse LLM response as JSON: ",
+      "obfuscation_techniques": [
+        "cff"
+      ]
+    }
+  ]
+}

@@ -32,7 +32,13 @@ from pentestgpt_agent.protocol import (
 )
 from pentestgpt_agent.protocol.contracts import utc_now
 
-from .parser import analysis_evidence, findings_from_analysis, load_analysis, parse_info_output
+from .parser import (
+    analysis_evidence,
+    analysis_sha256,
+    load_analysis,
+    parse_info_output,
+    parse_reverse_analysis,
+)
 
 
 @dataclass
@@ -268,20 +274,59 @@ class KongAdapter(AgentAdapter):
                 self.agent_id,
             )
         )
-        stats = analysis["stats"]
-        functions = findings_from_analysis(analysis, evidence_id=evidence.evidence_id)
+        parsed = parse_reverse_analysis(
+            analysis,
+            evidence_id=evidence.evidence_id,
+            artifact_sha256=analysis_sha256(analysis_path),
+        )
+        stats = parsed.stats
+        functions = parsed.findings
+        diagnostics = parsed.diagnostics.to_dict()
+        if parsed.semantic_adequate:
+            status = ExecutionStatus.SUCCESS
+            summary = (
+                f"Kong analyzed {stats.get('analyzed', len(functions))} functions and "
+                f"produced {len(functions)} structured function result(s) "
+                f"({diagnostics['named_records']} named)."
+            )
+            error = None
+        else:
+            status = ExecutionStatus.PARTIAL
+            summary = (
+                f"Kong's process succeeded but produced insufficient semantic output: "
+                f"errors={stats.get('errors', 0)}, named={stats.get('named', 0)}, "
+                f"analyzed={stats.get('analyzed', 0)}, records={diagnostics['parsed_records']}."
+            )
+            error = ErrorDetail(
+                ErrorCategory.BACKEND_ERROR,
+                "Kong process succeeded but semantic output is insufficient (no named functions).",
+                code="KONG_SEMANTIC_OUTPUT_INSUFFICIENT",
+                metadata={
+                    "errors": stats.get("errors", 0),
+                    "named": stats.get("named", 0),
+                    "analyzed": stats.get("analyzed", 0),
+                },
+            )
         return AgentResult(
             task_id=prepared.task_spec.task_id,
             agent_id=self.agent_id,
             domain=prepared.task_spec.domain,
-            status=ExecutionStatus.SUCCESS,
+            status=status,
             started_at=context.started_at,
             finished_at=utc_now(),
-            summary=f"Kong analyzed {stats.get('analyzed', len(functions))} functions and produced {len(functions)} structured function results.",
+            summary=summary,
             findings=functions,
             evidence=(evidence,),
             artifacts=tuple(artifacts),
-            metrics={**stats, "adapter_wall_seconds": elapsed, "mode": "analyze"},
+            metrics={
+                **stats,
+                "adapter_wall_seconds": elapsed,
+                "mode": "analyze",
+                "process_success": True,
+                "semantic_adequate": parsed.semantic_adequate,
+                "parse_diagnostics": diagnostics,
+            },
+            error=error,
             raw_output={"returncode": returncode, "stdout_log": str(context.stdout_path), "stderr_log": str(context.stderr_path), "kong_analysis": analysis},
         )
 

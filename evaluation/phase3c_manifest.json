@@ -52,6 +52,11 @@
     "policy": {"max_attempts": 3, "max_repeated_invalid": 2, "max_repeated_backend_failure": 2},
     "report": "HUNTER_SUPERVISOR_CONTRACT_RELIABILITY_REPORT.md"
   },
+  "phase3d_b_reverse_ingress": {
+    "status": "applied on top of phase3d-a",
+    "summary": "Hunter reverse-result ingress (integrations/kong/parser.py): categorized per-record parse diagnostics + provenance + honest PARTIAL when Kong process succeeded but semantic output is insufficient. Kong upstream kernel not modified; root cause is Kong OpenAIClient ignoring deepseek-v4-flash reasoning_content.",
+    "report": "HUNTER_KONG_SYNTHESIS_PARSER_REPORT.md"
+  },
   "benchmark_evidence": {
     "reverse_liblzma_backdoor": {
       "file": ".runtime/eval-artifacts/reverse/extracted/usr/lib/x86_64-linux-gnu/liblzma.so.5.6.1",
