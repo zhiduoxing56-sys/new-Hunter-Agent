@@ -564,11 +564,6 @@ def _reverse_analysis_summary(rec: dict) -> dict[str, Any]:
                         summary["errors"] = stats.get("errors")
                         summary["named"] = stats.get("named")
                         summary["kong_llm_calls"] = stats.get("llm_calls")
-                        diag = analysis.get("parse_diagnostics") or {}
-                        summary["parsed_records"] = diag.get("parsed_records")
-                        summary["named_records"] = diag.get("named_records")
-                        summary["skipped_records"] = diag.get("skipped_records")
-                        summary["error_categories"] = diag.get("error_categories")
                     except (OSError, ValueError, json.JSONDecodeError):
                         pass
     return summary

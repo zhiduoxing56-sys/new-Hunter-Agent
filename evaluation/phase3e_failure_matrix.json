@@ -1,0 +1,88 @@
+{
+  "evaluation_id": "phase3e_2026-09-01",
+  "snapshot_sha": "aa7dc1d",
+  "note": "every non-verified run has exactly one primary failure class; availability classes are reported separately",
+  "matrix": {
+    "VERIFIED_SUCCESS": {
+      "count": 11,
+      "cases": {
+        "pentest-autopenbench-web_security-vm0-900s": 1,
+        "pentest-autopenbench-web_security-vm1-900s": 1,
+        "pentest-autopenbench-web_security-vm2-900s": 1,
+        "vr-fuzzingbrain-hunterdemo-positive": 3,
+        "dfir-trudi-full-eicar-sanity": 2,
+        "cross-domain-trudi-kong-provenance": 3
+      },
+      "run_ids": [
+        "phase3e-cross_domain_trudi_kong_provenance-20260901-100746-fb8e9",
+        "phase3e-cross_domain_trudi_kong_provenance-20260901-113907-d7268",
+        "phase3e-cross_domain_trudi_kong_provenance-20260901-114115-6a6b6",
+        "phase3e-dfir_trudi_full_eicar_sanity-20260901-132127-48088",
+        "phase3e-dfir_trudi_full_eicar_sanity-20260901-133224-72e25",
+        "phase3e-pentest_autopenbench_web_security_vm0_900s-20260901-110909-b1a0b",
+        "phase3e-pentest_autopenbench_web_security_vm1_900s-20260901-111902-b88b8",
+        "phase3e-pentest_autopenbench_web_security_vm2_900s-20260901-112514-32729",
+        "phase3e-vr_fuzzingbrain_hunterdemo_positive-20260901-100945-b7f0c",
+        "phase3e-vr_fuzzingbrain_hunterdemo_positive-20260901-114315-d2e7b",
+        "phase3e-vr_fuzzingbrain_hunterdemo_positive-20260901-114759-88315"
+      ]
+    },
+    "INVALID_DECISION_EXHAUSTION": {
+      "count": 4,
+      "cases": {
+        "pentest-autopenbench-web_security-vm0-900s": 2,
+        "pentest-autopenbench-web_security-vm1-900s": 1,
+        "pentest-autopenbench-web_security-vm2-900s": 1
+      },
+      "run_ids": [
+        "phase3e-pentest_autopenbench_web_security_vm0_900s-20260901-120826-141a0",
+        "phase3e-pentest_autopenbench_web_security_vm0_900s-20260901-121907-974ca",
+        "phase3e-pentest_autopenbench_web_security_vm1_900s-20260901-120043-10bbd",
+        "phase3e-pentest_autopenbench_web_security_vm2_900s-20260901-122620-3e243"
+      ]
+    },
+    "VERIFICATION_FAILURE": {
+      "count": 3,
+      "cases": {
+        "pentest-autopenbench-web_security-vm1-900s": 1,
+        "pentest-autopenbench-web_security-vm2-900s": 1,
+        "reverse-kong-liblzma-backdoor": 1
+      },
+      "run_ids": [
+        "phase3e-pentest_autopenbench_web_security_vm1_900s-20260901-115132-40984",
+        "phase3e-pentest_autopenbench_web_security_vm2_900s-20260901-123912-3c2e9",
+        "phase3e-reverse_kong_liblzma_backdoor-20260901-124813-23926"
+      ]
+    },
+    "TIMEOUT": {
+      "count": 3,
+      "cases": {
+        "vr-fuzzingbrain-hunterdemo-fixed": 3
+      },
+      "run_ids": [
+        "phase3e-vr_fuzzingbrain_hunterdemo_fixed-20260901-101250-aa519",
+        "phase3e-vr_fuzzingbrain_hunterdemo_fixed-20260901-134414-c835a",
+        "phase3e-vr_fuzzingbrain_hunterdemo_fixed-20260901-140022-01403"
+      ]
+    },
+    "BACKEND_SEMANTIC_FAILURE": {
+      "count": 2,
+      "cases": {
+        "reverse-kong-liblzma-backdoor": 2
+      },
+      "run_ids": [
+        "phase3e-reverse_kong_liblzma_backdoor-20260901-105352-90f0b",
+        "phase3e-reverse_kong_liblzma_backdoor-20260901-130424-badd6"
+      ]
+    },
+    "BUDGET_EXHAUSTED": {
+      "count": 1,
+      "cases": {
+        "dfir-trudi-full-eicar-sanity": 1
+      },
+      "run_ids": [
+        "phase3e-dfir_trudi_full_eicar_sanity-20260901-103025-b902b"
+      ]
+    }
+  }
+}

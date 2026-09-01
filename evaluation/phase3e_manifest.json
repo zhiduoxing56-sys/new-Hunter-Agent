@@ -16,7 +16,7 @@
     "trudi": "10559b1",
     "fuzzingbrain": "a9a1fbf",
     "autopenbench": "9c4890a",
-    "evaluation_harness": "to_be_frozen_at_step_C"
+    "evaluation_harness": "83b9f42 (Phase 3E harness freeze commit)"
   },
   "environment": {
     "os": "Ubuntu 24.04.3 LTS",
@@ -107,6 +107,12 @@
       "path": "third_party/fuzzingbrain/fixtures/hunterdemo_fixed",
       "note": "negative-control fixture (frozen fixture in fuzzingbrain submodule)"
     }
+  },
+  "dfir_evtx_capability_case": {
+    "status": "NOT_ESTABLISHED",
+    "coverage": "DFIR complex-capability coverage = LIMITED (EICAR sanity only; no real EVTX Chainsaw capability case)",
+    "reason": "TRUDI misc_chainsaw_hunt requires the chainsaw binary, which is an OPTIONAL TRUDI dependency (install.sh step 95) and is NOT installed in the frozen runtime (/opt/chainsaw, /usr/local/share/chainsaw, /usr/share/chainsaw all absent). Installing it would modify the frozen TRUDI toolset/runtime, which Phase 3E forbids. No public EVTX corpus was exercised because the qualified Chainsaw path cannot run without that binary. No synthetic EVTX benchmark was fabricated.",
+    "evidence_acquisition_manifest": null
   },
   "benchmark_start_timestamp": "2026-09-01T18:07:46+08:00",
   "freeze_guard": {

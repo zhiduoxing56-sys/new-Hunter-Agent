@@ -1,0 +1,611 @@
+{
+  "evaluation_id": "phase3e_2026-09-01",
+  "snapshot_sha": "aa7dc1d",
+  "total_runs": 24,
+  "invalid_evaluation_runs": 2,
+  "per_case": {
+    "pentest-autopenbench-web_security-vm0-900s": {
+      "case_id": "pentest-autopenbench-web_security-vm0-900s",
+      "domain": "pentest",
+      "tier": "T1",
+      "ground_truth_domain": "pentest",
+      "repetitions_total": 3,
+      "success_count": 1,
+      "false_success_count": 0,
+      "outcome_sequence": [
+        "VERIFIED_SUCCESS",
+        "INVALID_DECISION_EXHAUSTION",
+        "INVALID_DECISION_EXHAUSTION"
+      ],
+      "classification_distribution": {
+        "VERIFIED_SUCCESS": 1,
+        "INVALID_DECISION_EXHAUSTION": 2
+      },
+      "duration": [
+        586.61,
+        641.65,
+        421.71
+      ],
+      "tool_calls": [
+        3,
+        3,
+        3
+      ],
+      "success_rate": 33.3,
+      "duration_median": 586.6,
+      "duration_min": 421.7,
+      "duration_max": 641.6,
+      "tool_calls_median": 3,
+      "wilson_95": {
+        "point": 0.3333,
+        "ci_low": 0.0615,
+        "ci_high": 0.7923
+      },
+      "stability": "1/3 occasional success, poor repeatability",
+      "high_variance": true
+    },
+    "pentest-autopenbench-web_security-vm1-900s": {
+      "case_id": "pentest-autopenbench-web_security-vm1-900s",
+      "domain": "pentest",
+      "tier": "T1",
+      "ground_truth_domain": "pentest",
+      "repetitions_total": 3,
+      "success_count": 1,
+      "false_success_count": 0,
+      "outcome_sequence": [
+        "VERIFIED_SUCCESS",
+        "VERIFICATION_FAILURE",
+        "INVALID_DECISION_EXHAUSTION"
+      ],
+      "classification_distribution": {
+        "VERIFIED_SUCCESS": 1,
+        "VERIFICATION_FAILURE": 1,
+        "INVALID_DECISION_EXHAUSTION": 1
+      },
+      "duration": [
+        368.84,
+        550.58,
+        453.94
+      ],
+      "tool_calls": [
+        3,
+        3,
+        3
+      ],
+      "success_rate": 33.3,
+      "duration_median": 453.9,
+      "duration_min": 368.8,
+      "duration_max": 550.6,
+      "tool_calls_median": 3,
+      "wilson_95": {
+        "point": 0.3333,
+        "ci_low": 0.0615,
+        "ci_high": 0.7923
+      },
+      "stability": "1/3 occasional success, poor repeatability",
+      "high_variance": true
+    },
+    "pentest-autopenbench-web_security-vm2-900s": {
+      "case_id": "pentest-autopenbench-web_security-vm2-900s",
+      "domain": "pentest",
+      "tier": "T1",
+      "ground_truth_domain": "pentest",
+      "repetitions_total": 3,
+      "success_count": 1,
+      "false_success_count": 0,
+      "outcome_sequence": [
+        "VERIFIED_SUCCESS",
+        "INVALID_DECISION_EXHAUSTION",
+        "VERIFICATION_FAILURE"
+      ],
+      "classification_distribution": {
+        "VERIFIED_SUCCESS": 1,
+        "INVALID_DECISION_EXHAUSTION": 1,
+        "VERIFICATION_FAILURE": 1
+      },
+      "duration": [
+        692.14,
+        772.03,
+        537.14
+      ],
+      "tool_calls": [
+        3,
+        3,
+        3
+      ],
+      "success_rate": 33.3,
+      "duration_median": 692.1,
+      "duration_min": 537.1,
+      "duration_max": 772.0,
+      "tool_calls_median": 3,
+      "wilson_95": {
+        "point": 0.3333,
+        "ci_low": 0.0615,
+        "ci_high": 0.7923
+      },
+      "stability": "1/3 occasional success, poor repeatability",
+      "high_variance": true
+    },
+    "vr-fuzzingbrain-hunterdemo-positive": {
+      "case_id": "vr-fuzzingbrain-hunterdemo-positive",
+      "domain": "vulnerability_research",
+      "tier": "T1",
+      "ground_truth_domain": "vulnerability_research",
+      "repetitions_total": 3,
+      "success_count": 3,
+      "false_success_count": 0,
+      "outcome_sequence": [
+        "VERIFIED_SUCCESS",
+        "VERIFIED_SUCCESS",
+        "VERIFIED_SUCCESS"
+      ],
+      "classification_distribution": {
+        "VERIFIED_SUCCESS": 3
+      },
+      "duration": [
+        177.63,
+        284.83,
+        208.81
+      ],
+      "tool_calls": [
+        0,
+        0,
+        0
+      ],
+      "success_rate": 100.0,
+      "duration_median": 208.8,
+      "duration_min": 177.6,
+      "duration_max": 284.8,
+      "tool_calls_median": 0,
+      "wilson_95": {
+        "point": 1.0,
+        "ci_low": 0.4385,
+        "ci_high": 1.0
+      },
+      "stability": "3/3 stable under this frozen case/profile"
+    },
+    "vr-fuzzingbrain-hunterdemo-fixed": {
+      "case_id": "vr-fuzzingbrain-hunterdemo-fixed",
+      "domain": "vulnerability_research",
+      "tier": "T1",
+      "ground_truth_domain": "vulnerability_research",
+      "repetitions_total": 3,
+      "success_count": 0,
+      "false_success_count": 0,
+      "outcome_sequence": [
+        "TIMEOUT",
+        "TIMEOUT",
+        "TIMEOUT"
+      ],
+      "classification_distribution": {
+        "TIMEOUT": 3
+      },
+      "duration": [
+        992.77,
+        968.02,
+        645.69
+      ],
+      "tool_calls": [
+        0,
+        0,
+        0
+      ],
+      "success_rate": 0.0,
+      "duration_median": 968.0,
+      "duration_min": 645.7,
+      "duration_max": 992.8,
+      "tool_calls_median": 0,
+      "wilson_95": {
+        "point": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.5615
+      },
+      "stability": "0/3 no success observed"
+    },
+    "reverse-kong-liblzma-backdoor": {
+      "case_id": "reverse-kong-liblzma-backdoor",
+      "domain": "reverse",
+      "tier": "T1",
+      "ground_truth_domain": "reverse",
+      "repetitions_total": 3,
+      "success_count": 0,
+      "false_success_count": 0,
+      "outcome_sequence": [
+        "BACKEND_SEMANTIC_FAILURE",
+        "VERIFICATION_FAILURE",
+        "BACKEND_SEMANTIC_FAILURE"
+      ],
+      "classification_distribution": {
+        "BACKEND_SEMANTIC_FAILURE": 2,
+        "VERIFICATION_FAILURE": 1
+      },
+      "duration": [
+        908.69,
+        970.55,
+        978.14
+      ],
+      "tool_calls": [
+        3,
+        0,
+        3
+      ],
+      "success_rate": 0.0,
+      "duration_median": 970.5,
+      "duration_min": 908.7,
+      "duration_max": 978.1,
+      "tool_calls_median": 3,
+      "wilson_95": {
+        "point": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.5615
+      },
+      "stability": "0/3 no success observed",
+      "high_variance": true
+    },
+    "dfir-trudi-full-eicar-sanity": {
+      "case_id": "dfir-trudi-full-eicar-sanity",
+      "domain": "dfir",
+      "tier": "T1",
+      "ground_truth_domain": "dfir",
+      "repetitions_total": 3,
+      "success_count": 2,
+      "false_success_count": 0,
+      "outcome_sequence": [
+        "BUDGET_EXHAUSTED",
+        "VERIFIED_SUCCESS",
+        "VERIFIED_SUCCESS"
+      ],
+      "classification_distribution": {
+        "BUDGET_EXHAUSTED": 1,
+        "VERIFIED_SUCCESS": 2
+      },
+      "duration": [
+        1323.24,
+        657.88,
+        704.21
+      ],
+      "tool_calls": [
+        0,
+        0,
+        0
+      ],
+      "success_rate": 66.7,
+      "duration_median": 704.2,
+      "duration_min": 657.9,
+      "duration_max": 1323.2,
+      "tool_calls_median": 0,
+      "wilson_95": {
+        "point": 0.6667,
+        "ci_low": 0.2077,
+        "ci_high": 0.9385
+      },
+      "stability": "2/3 real capability but insufficient repeatability",
+      "high_variance": true
+    },
+    "cross-domain-trudi-kong-provenance": {
+      "case_id": "cross-domain-trudi-kong-provenance",
+      "domain": "dfir",
+      "tier": "T2",
+      "ground_truth_domain": "dfir",
+      "repetitions_total": 3,
+      "success_count": 3,
+      "false_success_count": 0,
+      "outcome_sequence": [
+        "VERIFIED_SUCCESS",
+        "VERIFIED_SUCCESS",
+        "VERIFIED_SUCCESS"
+      ],
+      "classification_distribution": {
+        "VERIFIED_SUCCESS": 3
+      },
+      "duration": [
+        109.72,
+        128.13,
+        116.69
+      ],
+      "tool_calls": [
+        3,
+        3,
+        3
+      ],
+      "success_rate": 100.0,
+      "duration_median": 116.7,
+      "duration_min": 109.7,
+      "duration_max": 128.1,
+      "tool_calls_median": 3,
+      "wilson_95": {
+        "point": 1.0,
+        "ci_low": 0.4385,
+        "ci_high": 1.0
+      },
+      "stability": "3/3 stable under this frozen case/profile"
+    }
+  },
+  "per_domain": {
+    "pentest": {
+      "domain": "pentest",
+      "cases": [
+        "pentest-autopenbench-web_security-vm0-900s",
+        "pentest-autopenbench-web_security-vm1-900s",
+        "pentest-autopenbench-web_security-vm2-900s"
+      ],
+      "runs": 9,
+      "eligible": 9,
+      "verified_success": 3,
+      "false_success": 0,
+      "availability_failures": 0,
+      "eligible_cases": [
+        "pentest-autopenbench-web_security-vm0-900s",
+        "pentest-autopenbench-web_security-vm0-900s",
+        "pentest-autopenbench-web_security-vm0-900s",
+        "pentest-autopenbench-web_security-vm1-900s",
+        "pentest-autopenbench-web_security-vm1-900s",
+        "pentest-autopenbench-web_security-vm1-900s",
+        "pentest-autopenbench-web_security-vm2-900s",
+        "pentest-autopenbench-web_security-vm2-900s",
+        "pentest-autopenbench-web_security-vm2-900s"
+      ],
+      "verified_success_rate": 33.3
+    },
+    "vulnerability_research": {
+      "domain": "vulnerability_research",
+      "cases": [
+        "vr-fuzzingbrain-hunterdemo-positive",
+        "vr-fuzzingbrain-hunterdemo-fixed"
+      ],
+      "runs": 6,
+      "eligible": 6,
+      "verified_success": 3,
+      "false_success": 0,
+      "availability_failures": 0,
+      "eligible_cases": [
+        "vr-fuzzingbrain-hunterdemo-positive",
+        "vr-fuzzingbrain-hunterdemo-positive",
+        "vr-fuzzingbrain-hunterdemo-positive",
+        "vr-fuzzingbrain-hunterdemo-fixed",
+        "vr-fuzzingbrain-hunterdemo-fixed",
+        "vr-fuzzingbrain-hunterdemo-fixed"
+      ],
+      "verified_success_rate": 50.0
+    },
+    "reverse": {
+      "domain": "reverse",
+      "cases": [
+        "reverse-kong-liblzma-backdoor"
+      ],
+      "runs": 3,
+      "eligible": 3,
+      "verified_success": 0,
+      "false_success": 0,
+      "availability_failures": 0,
+      "eligible_cases": [
+        "reverse-kong-liblzma-backdoor",
+        "reverse-kong-liblzma-backdoor",
+        "reverse-kong-liblzma-backdoor"
+      ],
+      "verified_success_rate": 0.0
+    },
+    "dfir": {
+      "domain": "dfir",
+      "cases": [
+        "dfir-trudi-full-eicar-sanity",
+        "cross-domain-trudi-kong-provenance"
+      ],
+      "runs": 6,
+      "eligible": 6,
+      "verified_success": 5,
+      "false_success": 0,
+      "availability_failures": 0,
+      "eligible_cases": [
+        "dfir-trudi-full-eicar-sanity",
+        "dfir-trudi-full-eicar-sanity",
+        "dfir-trudi-full-eicar-sanity",
+        "cross-domain-trudi-kong-provenance",
+        "cross-domain-trudi-kong-provenance",
+        "cross-domain-trudi-kong-provenance"
+      ],
+      "verified_success_rate": 83.3
+    }
+  },
+  "system_reliability": {
+    "routing_accuracy": {
+      "correct": 24,
+      "total": 24,
+      "rate": 100.0
+    },
+    "runtime_available_rate": 100.0,
+    "benchmark_available_rate": 100.0,
+    "raw_invalid_decision_attempts": 34,
+    "accepted_decisions": 81
+  },
+  "capability": {
+    "eligible_denominator": 24,
+    "verified_task_success": 11,
+    "verified_task_success_rate": 45.8,
+    "domain_macro_verified_success_rate": 41.6,
+    "case_weighted_overall_success": {
+      "numerator": 11,
+      "denominator": 24,
+      "case_composition": [
+        "pentest-autopenbench-web_security-vm0-900s",
+        "pentest-autopenbench-web_security-vm1-900s",
+        "pentest-autopenbench-web_security-vm2-900s",
+        "vr-fuzzingbrain-hunterdemo-positive",
+        "vr-fuzzingbrain-hunterdemo-fixed",
+        "reverse-kong-liblzma-backdoor",
+        "dfir-trudi-full-eicar-sanity",
+        "cross-domain-trudi-kong-provenance"
+      ]
+    },
+    "false_success": 0,
+    "false_success_rate": 0.0,
+    "availability_runs": 0,
+    "note": "RUNTIME_UNAVAILABLE/UNSUPPORTED_EVIDENCE/BENCHMARK_MISSING excluded from the capability denominator."
+  },
+  "robustness": {
+    "pentest-autopenbench-web_security-vm0-900s": {
+      "success_count": 1,
+      "repetitions": 3,
+      "outcome_sequence": [
+        "VERIFIED_SUCCESS",
+        "INVALID_DECISION_EXHAUSTION",
+        "INVALID_DECISION_EXHAUSTION"
+      ],
+      "dominant_failure_class": "INVALID_DECISION_EXHAUSTION",
+      "duration_median": 586.6,
+      "duration_min": 421.7,
+      "duration_max": 641.6,
+      "tool_calls_median": 3,
+      "wilson_95": {
+        "point": 0.3333,
+        "ci_low": 0.0615,
+        "ci_high": 0.7923
+      },
+      "high_variance": true
+    },
+    "pentest-autopenbench-web_security-vm1-900s": {
+      "success_count": 1,
+      "repetitions": 3,
+      "outcome_sequence": [
+        "VERIFIED_SUCCESS",
+        "VERIFICATION_FAILURE",
+        "INVALID_DECISION_EXHAUSTION"
+      ],
+      "dominant_failure_class": "VERIFIED_SUCCESS",
+      "duration_median": 453.9,
+      "duration_min": 368.8,
+      "duration_max": 550.6,
+      "tool_calls_median": 3,
+      "wilson_95": {
+        "point": 0.3333,
+        "ci_low": 0.0615,
+        "ci_high": 0.7923
+      },
+      "high_variance": true
+    },
+    "pentest-autopenbench-web_security-vm2-900s": {
+      "success_count": 1,
+      "repetitions": 3,
+      "outcome_sequence": [
+        "VERIFIED_SUCCESS",
+        "INVALID_DECISION_EXHAUSTION",
+        "VERIFICATION_FAILURE"
+      ],
+      "dominant_failure_class": "VERIFIED_SUCCESS",
+      "duration_median": 692.1,
+      "duration_min": 537.1,
+      "duration_max": 772.0,
+      "tool_calls_median": 3,
+      "wilson_95": {
+        "point": 0.3333,
+        "ci_low": 0.0615,
+        "ci_high": 0.7923
+      },
+      "high_variance": true
+    },
+    "vr-fuzzingbrain-hunterdemo-positive": {
+      "success_count": 3,
+      "repetitions": 3,
+      "outcome_sequence": [
+        "VERIFIED_SUCCESS",
+        "VERIFIED_SUCCESS",
+        "VERIFIED_SUCCESS"
+      ],
+      "dominant_failure_class": "VERIFIED_SUCCESS",
+      "duration_median": 208.8,
+      "duration_min": 177.6,
+      "duration_max": 284.8,
+      "tool_calls_median": 0,
+      "wilson_95": {
+        "point": 1.0,
+        "ci_low": 0.4385,
+        "ci_high": 1.0
+      },
+      "high_variance": false
+    },
+    "vr-fuzzingbrain-hunterdemo-fixed": {
+      "success_count": 0,
+      "repetitions": 3,
+      "outcome_sequence": [
+        "TIMEOUT",
+        "TIMEOUT",
+        "TIMEOUT"
+      ],
+      "dominant_failure_class": "TIMEOUT",
+      "duration_median": 968.0,
+      "duration_min": 645.7,
+      "duration_max": 992.8,
+      "tool_calls_median": 0,
+      "wilson_95": {
+        "point": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.5615
+      },
+      "high_variance": false
+    },
+    "reverse-kong-liblzma-backdoor": {
+      "success_count": 0,
+      "repetitions": 3,
+      "outcome_sequence": [
+        "BACKEND_SEMANTIC_FAILURE",
+        "VERIFICATION_FAILURE",
+        "BACKEND_SEMANTIC_FAILURE"
+      ],
+      "dominant_failure_class": "BACKEND_SEMANTIC_FAILURE",
+      "duration_median": 970.5,
+      "duration_min": 908.7,
+      "duration_max": 978.1,
+      "tool_calls_median": 3,
+      "wilson_95": {
+        "point": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.5615
+      },
+      "high_variance": true
+    },
+    "dfir-trudi-full-eicar-sanity": {
+      "success_count": 2,
+      "repetitions": 3,
+      "outcome_sequence": [
+        "BUDGET_EXHAUSTED",
+        "VERIFIED_SUCCESS",
+        "VERIFIED_SUCCESS"
+      ],
+      "dominant_failure_class": "VERIFIED_SUCCESS",
+      "duration_median": 704.2,
+      "duration_min": 657.9,
+      "duration_max": 1323.2,
+      "tool_calls_median": 0,
+      "wilson_95": {
+        "point": 0.6667,
+        "ci_low": 0.2077,
+        "ci_high": 0.9385
+      },
+      "high_variance": true
+    },
+    "cross-domain-trudi-kong-provenance": {
+      "success_count": 3,
+      "repetitions": 3,
+      "outcome_sequence": [
+        "VERIFIED_SUCCESS",
+        "VERIFIED_SUCCESS",
+        "VERIFIED_SUCCESS"
+      ],
+      "dominant_failure_class": "VERIFIED_SUCCESS",
+      "duration_median": 116.7,
+      "duration_min": 109.7,
+      "duration_max": 128.1,
+      "tool_calls_median": 3,
+      "wilson_95": {
+        "point": 1.0,
+        "ci_low": 0.4385,
+        "ci_high": 1.0
+      },
+      "high_variance": false
+    }
+  },
+  "efficiency": {
+    "cost_not_observed": true,
+    "note": "no real API billing observed; token usage recorded per run when the provider exposed it; no price*quantity fabricated as real cost."
+  }
+}
