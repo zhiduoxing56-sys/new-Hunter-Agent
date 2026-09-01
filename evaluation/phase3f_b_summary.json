@@ -1,0 +1,84 @@
+{
+  "evaluation_id": "phase3f_b_2026-09-02",
+  "before_after": {
+    "specialist_only": {
+      "before_3fa": {
+        "n": 9,
+        "verified": 1,
+        "judge_reached": 9,
+        "exact_flag_capture": 1,
+        "backend_process_success": 1,
+        "runtime_tool_reliability_failures": 0,
+        "budget_exhaustion_rate": 7,
+        "tool_turn_exhausted": 5,
+        "search_budget_exhausted": 2,
+        "exploit_selection_failure": 0,
+        "exploit_execution_failure": 0,
+        "provider_model_error": 1,
+        "target_connection_error": 0,
+        "taxonomy_distribution": {
+          "tool_turn_exhausted": 5,
+          "search_budget_exhausted": 2,
+          "VERIFIED_SUCCESS": 1,
+          "provider/model_error": 1
+        },
+        "duration_median": 388.69,
+        "duration_p95": 665.24,
+        "model_request_median": 54,
+        "budget_remaining_median": null,
+        "decode_event_count": 0
+      },
+      "after_3fb": {
+        "n": 9,
+        "verified": 5,
+        "judge_reached": 9,
+        "exact_flag_capture": 5,
+        "backend_process_success": 5,
+        "runtime_tool_reliability_failures": 0,
+        "budget_exhaustion_rate": 4,
+        "tool_turn_exhausted": 3,
+        "search_budget_exhausted": 1,
+        "exploit_selection_failure": 0,
+        "exploit_execution_failure": 0,
+        "provider_model_error": 0,
+        "target_connection_error": 0,
+        "taxonomy_distribution": {
+          "search_budget_exhausted": 1,
+          "VERIFIED_SUCCESS": 5,
+          "tool_turn_exhausted": 3
+        },
+        "duration_median": 265.11,
+        "duration_p95": 388.33,
+        "model_request_median": 48,
+        "budget_remaining_median": 12,
+        "decode_event_count": 1
+      }
+    },
+    "hunter_mediated": {
+      "before_3e_frozen": {
+        "n": 9,
+        "verified": 3,
+        "judge_reached": 9,
+        "exact_flag_capture": 3,
+        "duration_median": 550.58
+      },
+      "after_3fb": {
+        "n": 9,
+        "verified": 2,
+        "judge_reached": 9,
+        "exact_flag_capture": 2,
+        "invalid_decisions": 4,
+        "verification_failures": 3,
+        "duration_median": 385.07
+      }
+    }
+  },
+  "false_success": {
+    "phase3f_a_specialist_only": 0,
+    "phase3f_b_specialist_only": 0,
+    "phase3e_frozen": 0,
+    "phase3f_b_hunter_mediated": 0
+  },
+  "verdict": "runtime/budget reliability closure succeeded: no tool_decode_error, no search-budget starvation, no generic provider crash in the 18 post-fix runs; remaining failures are honest tool_turn_exhausted / search_budget_exhausted / specialist planning limits.",
+  "phase3f_c_recommendation": "remaining specialist failures are dominated by real search/exploit behavior (tool_turn_exhausted at exploit stage, specialist planning contract) rather than runtime/budget engineering failures; recommend proceeding to Phase 3F-C (Pentest Search & Exploit Capability Optimization)."
+}

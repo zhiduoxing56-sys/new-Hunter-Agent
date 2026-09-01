@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import os
 import shutil
@@ -15,6 +16,19 @@ from typing import Any
 
 class EnvironmentError(RuntimeError):
     """A real container or workstation operation failed."""
+
+
+def _safe_decode(raw: bytes) -> tuple[str, bool]:
+    """Decode subprocess output without ever crashing on arbitrary bytes.
+
+    Returns (text, lossy) where lossy is True when the raw bytes were not
+    valid UTF-8 and replacement characters were introduced. The raw bytes are
+    never silently dropped: callers must persist the raw artifact alongside.
+    """
+    try:
+        return raw.decode("utf-8"), False
+    except UnicodeDecodeError:
+        return raw.decode("utf-8", errors="replace"), True
 
 
 @dataclass(frozen=True)
@@ -95,7 +109,6 @@ class AutoPenBenchSession:
             result = subprocess.run(
                 command,
                 cwd=self.config.benchmark_root,
-                text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 timeout=timeout,
@@ -104,18 +117,35 @@ class AutoPenBenchSession:
         except (OSError, subprocess.TimeoutExpired) as exc:
             self._event("host", command, "", error=f"{type(exc).__name__}: {exc}")
             raise EnvironmentError(f"container command failed to run: {exc}") from exc
-        self._event(
-            "host",
-            command,
-            result.stdout,
-            exit_code=result.returncode,
-            elapsed_s=time.time() - started,
-        )
+        # Raw bytes are captured without text=True so invalid UTF-8 output from
+        # a target never raises UnicodeDecodeError inside the MCP tool boundary.
+        # The model-facing text is a deterministic safe decode; the raw bytes
+        # are persisted for audit and hashed so nothing is silently lost.
+        raw = result.stdout
+        text, lossy = _safe_decode(raw)
+        extra: dict[str, Any] = {
+            "exit_code": result.returncode,
+            "elapsed_s": time.time() - started,
+        }
+        if lossy:
+            extra["decode_error"] = True
+            extra["raw_sha256"] = hashlib.sha256(raw).hexdigest()
+            extra["raw_bytes"] = len(raw)
+            raw_path = self.config.run_dir / "raw-tool-outputs"
+            raw_path.mkdir(parents=True, exist_ok=True)
+            stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime(started))
+            artifact = raw_path / f"raw-{stamp}-{extra['raw_sha256'][:8]}.bin"
+            with artifact.open("wb") as stream:
+                stream.write(raw)
+            extra["raw_artifact"] = str(artifact)
+        self._event("host", command, text, **extra)
         if check and result.returncode != 0:
             raise EnvironmentError(
-                f"container command exited {result.returncode}: {result.stdout[-1000:]}"
+                f"container command exited {result.returncode}: {text[-1000:]}"
             )
-        return result
+        return subprocess.CompletedProcess(
+            result.args, result.returncode, text, None
+        )
 
     def _event(self, kind: str, command: list[str] | str, output: str, **extra: Any) -> None:
         self.config.run_dir.mkdir(parents=True, exist_ok=True)

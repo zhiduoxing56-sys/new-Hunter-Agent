@@ -1,0 +1,44 @@
+{
+  "manifest_version": "1.0",
+  "evaluation_id": "phase3f_b_2026-09-02",
+  "phase": "3F-B",
+  "phase_label": "Pentest Specialist Runtime & Budget Reliability Closure",
+  "parent": "Phase 3F-A (13a2df8) / Phase 3E (aa7dc1d, harness 83b9f42, results 5b435f9)",
+  "note": "Reliability closure, not success-rate forcing. The goal is to eliminate avoidable runtime / tool-decode / budget-accounting / search-budget failures so remaining failures represent real search/exploit capability. Phase 3E denominator is untouched; no oracle/verifier/CompletionVerifier/prompt change.",
+  "commits": {
+    "hunter_agent": "aa7dc1d (unchanged)",
+    "pentestgpt_core": "69a42f9 (Phase 3F-B budget/runtime boundary fixes)",
+    "autopenbench": "9c4890a (unchanged)",
+    "kong/trudi/fuzzingbrain": "unchanged / out of scope",
+    "phase3f_b_evaluation_harness": "frozen at commit time"
+  },
+  "root_cause_summary": {
+    "tool_decode": "autopenbench_adapter/environment.py subprocess.run(text=True) raised UnicodeDecodeError on invalid UTF-8 target output, crashing the MCP tool and killing the run (Phase 3E vm1 rep2).",
+    "tool_turn_exhaustion": "openai_compatible.py raised a generic provider AgentRunError at max tool turns, so genuine budget exhaustion looked like an infra crash and could not be recovered or honestly classified (4 Phase 3E + 5 control runs).",
+    "search_budget_starvation": "search_budget.grant() capped ALL hypotheses (including goal-directed EXPLOIT) at ordinary_hypothesis_max_consecutive_turns=3, and TEST hypotheses drained the high_priority_reserve so the global 30-turn budget ran out before EXPLOIT was scheduled (Phase 3F-A vm2)."
+  },
+  "changes": [
+    {"workstream": "A", "file": "autopenbench_adapter/environment.py", "change": "bytes-safe subprocess capture; deterministic safe-decode; raw artifact + SHA-256 persisted; decode_error diagnostic recorded; never crashes on invalid UTF-8."},
+    {"workstream": "B", "file": "pentestgpt-core/openai_compatible.py", "change": "max tool turns yields honest TurnCompleted(stop_reason=error_max_turns) instead of raising; loop classifies max_turns / tool_turn_exhausted and attempts StructuredOutput recovery."},
+    {"workstream": "B/C", "file": "pentestgpt-core/search_budget.py", "change": "goal-directed kinds (exploit/verify/recover) protected by high_priority_reserve with kind-based consecutive cap (EXPLOIT=9 etc.); exploratory kinds (discover/enumerate/test) capped to ordinary budget; machine-readable grant ledger added to snapshot()."},
+    {"workstream": "B/C", "file": "pentestgpt-core/loop.py", "change": "pass _EXECUTOR_TURN_BUDGETS as the goal-directed consecutive-turn cap."},
+    {"workstream": "D", "file": "evaluation/phase3f_b_taxonomy.py", "change": "auditable taxonomy mapping (tool_turn_exhausted, search_budget_exhausted, tool_decode_error, target_connection_error, provider/model_error, command_timeout, exploit_*)."}
+  ],
+  "budget_accounting_before": {
+    "exploit_consecutive_turn_cap": 3,
+    "test_reserve_eligibility": "yes (TEST could drain high_priority_reserve)",
+    "provider_max_turns_classification": "generic provider crash",
+    "per_run_budget_ledger": "global snapshot only (per-run grants not recorded)"
+  },
+  "budget_accounting_after": {
+    "exploit_consecutive_turn_cap": "kind-based (EXPLOIT=9, VERIFY=4, RECOVER=11)",
+    "test_reserve_eligibility": "no (exploratory uses ordinary budget only)",
+    "provider_max_turns_classification": "max_turns / tool_turn_exhausted (honest)",
+    "per_run_budget_ledger": "grant_ledger with granted/remaining/reason per grant"
+  },
+  "validation": {
+    "specialist_only_matrix": "9 runs (vm0/vm1/vm2 x3) post-fix",
+    "hunter_mediated_matrix": "9 runs (vm0/vm1/vm2 x3) post-fix",
+    "success_definition": "AutoPenBench exact-flag judge oracle only"
+  }
+}
