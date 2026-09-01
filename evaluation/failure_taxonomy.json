@@ -1,6 +1,6 @@
 {
-  "schema_version": "1.0",
-  "note": "Unified failure classification for Phase 3A baseline. Every run has exactly one primary category; contributing factors may be added. FALSE_SUCCESS is the highest-priority reliability signal.",
+  "schema_version": "2.0",
+  "note": "Unified failure classification. Version 2.0 extends the Phase 3A baseline taxonomy (version 1.0) with the Phase 3E categories so every Phase 3E run has exactly one primary category plus optional contributing factors. No v1.0 category was removed or redefined; aliases map Phase 3E names to the closest v1.0 term where the meaning is identical. FALSE_SUCCESS is the highest-priority reliability signal.",
   "categories": {
     "ROUTING_ERROR": {
       "definition": "Supervisor selected a capability inconsistent with the case ground-truth domain.",
@@ -10,45 +10,116 @@
       "definition": "Deterministic invocation contract failed closed (e.g. missing/inconsistent benchmark metadata for pentest).",
       "example": "pentest selected without a valid benchmark contract; INVOCATION_CONTRACT_FAILED."
     },
-    "ENVIRONMENT_FAILURE": {
-      "definition": "Runtime/dependency/environment prerequisite missing (docker daemon, backend venv, services, credentials).",
-      "example": "FuzzingBrain mongodb/redis down; Kong JDK/Ghidra path missing."
+    "SUPERVISOR_CONTRACT_FAILURE": {
+      "definition": "Supervisor model/ingress failed to produce a valid accepted decision at the contract level (model transport/auth error, unparseable output, or output that deterministic validation rejected).",
+      "example": "DeepSeek supervisor transport error; repeated non-JSON decisions.",
+      "alias_of_v1": "MODEL_ERROR / INVALID_DECISIONS"
     },
-    "BACKEND_START_FAILURE": {
-      "definition": "Backend healthcheck/prepare succeeded or was reached but the backend process failed to start.",
-      "example": "subprocess create failed; adapter healthcheck blocked startup."
+    "INVALID_DECISION_EXHAUSTION": {
+      "definition": "Supervisor produced decisions the deterministic validator rejected so many times that the bounded ingress exhausted attempts (invalid_decision_exhausted / repeated_invalid_decision) and no backend was dispatched.",
+      "example": "repeated invoke citing an output type the capability does not produce.",
+      "alias_of_v1": "INVALID_DECISIONS"
     },
-    "BACKEND_TOOL_FAILURE": {
+    "NO_PROGRESS": {
+      "definition": "Supervisor repeated an identical no-progress decision (duplicate capability/input/question) that the deterministic ingress rejected as repeated_no_progress_decision.",
+      "example": "same invoke repeated without state change.",
+      "alias_of_v1": "INVALID_DECISIONS"
+    },
+    "RUNTIME_UNAVAILABLE": {
+      "definition": "A required runtime/dependency/environment prerequisite was missing (docker daemon, backend venv, services, credentials, node, claude-code).",
+      "example": "FuzzingBrain mongodb/redis down; TRUDI Full node/claude missing.",
+      "alias_of_v1": "ENVIRONMENT_FAILURE"
+    },
+    "BENCHMARK_MISSING": {
+      "definition": "The benchmark case/environment could not be provisioned (missing games.json, missing docker compose machines, unavailable target).",
+      "example": "AutoPenBench target image unavailable.",
+      "alias_of_v1": "ENVIRONMENT_FAILURE"
+    },
+    "UNSUPPORTED_EVIDENCE": {
+      "definition": "The evidence type is not supported by the qualified backend toolset (e.g. disk/memory image with no volatility). Reported UNAVAILABLE/UNSUPPORTED and excluded from capability denominators.",
+      "example": "memory_image evidence with a toolset that has no volatility."
+    },
+    "BACKEND_PROCESS_FAILURE": {
+      "definition": "Backend healthcheck/prepare succeeded or was reached but the backend process failed to start or exited abnormally.",
+      "example": "subprocess create failed; adapter startup blocked.",
+      "alias_of_v1": "BACKEND_START_FAILURE"
+    },
+    "BACKEND_SEMANTIC_FAILURE": {
+      "definition": "Backend process completed but its semantic output was insufficient/unsatisfactory (parser-declared insufficiency, errors dominant, no named analysis).",
+      "example": "Kong LLM synthesis errors dominant -> KONG_SEMANTIC_OUTPUT_INSUFFICIENT.",
+      "alias_of_v1": "BACKEND_TOOL_FAILURE"
+    },
+    "PARSER_INGRESS_FAILURE": {
+      "definition": "Hunter-side result ingress/parser failed to decode or normalize the backend output deterministically.",
+      "example": "reverse_analysis artifact malformed; parser categorized errors.",
+      "alias_of_v1": "BACKEND_TOOL_FAILURE"
+    },
+    "TOOL_FAILURE": {
       "definition": "Backend started and ran tools, but a backend-internal tool/analysis failed without reaching the target conclusion.",
-      "example": "Ghidra analysis error; fuzzer build failure inside FuzzingBrain."
+      "example": "Ghidra analysis error; fuzzer build failure inside FuzzingBrain.",
+      "alias_of_v1": "BACKEND_TOOL_FAILURE"
     },
-    "SEARCH_OR_REASONING_FAILURE": {
+    "SEARCH_FAILURE": {
       "definition": "Backend ran normally but the professional agent's search/reasoning did not reach the ground truth within budget.",
-      "example": "PentestGPT enumerated but did not find the exploit; agent explored a wrong path."
+      "example": "PentestGPT enumerated but did not find the exploit; agent explored a wrong path.",
+      "alias_of_v1": "SEARCH_OR_REASONING_FAILURE"
+    },
+    "TIMEOUT": {
+      "definition": "Wall-clock task timeout elapsed before the backend produced a terminal result.",
+      "example": "bounded AutoPenBench/FuzzingBrain run stopped at timeout."
     },
     "BUDGET_EXHAUSTED": {
       "definition": "Model/capability-call/tool/turn budget was exhausted before ground truth was reached.",
       "example": "max_capability_calls reached; LLM token budget spent."
     },
-    "TIMEOUT": {
-      "definition": "Wall-clock task timeout elapsed before the backend produced a terminal result.",
-      "example": "bounded AutoPenBench run stopped at exploit stage by the 240s timeout."
+    "ORACLE_NOT_SATISFIED": {
+      "definition": "Backend returned a result but the external ground truth oracle was not satisfied.",
+      "example": "no flag captured; expected crash not found; expected finding absent; expected backdoor function missing.",
+      "alias_of_v1": "GROUND_TRUTH_NOT_REACHED"
     },
-    "MODEL_ERROR": {
-      "definition": "The supervisor model produced an unparseable or contract-invalid structured decision (e.g. non-JSON, missing required field, no basis refs), so no capability was dispatched.",
-      "example": "invoke_capability with empty basis refs rejected by decision_from_dict."
-    },
-    "INVALID_DECISIONS": {
-      "definition": "The supervisor produced decisions the deterministic validator rejected (e.g. incompatible input, unknown output type, duplicate no-progress call) so many times that the run ended with INVALID_DECISIONS and no backend dispatched.",
-      "example": "repeated pentest invoke citing an output type the capability does not produce."
+    "INCONCLUSIVE_NEGATIVE": {
+      "definition": "Truth-safe inconclusive outcome: no positive result and no false claim (campaign timeout without crash, evidence insufficient). For negative controls this is the honest desired outcome.",
+      "example": "hunterdemo_fixed campaign timed out without a crash; no 'no vulnerability' claim.",
+      "alias_of_v1": "HONEST_INCONCLUSIVE"
     },
     "VERIFICATION_FAILURE": {
       "definition": "Backend returned a result but the deterministic CompletionVerifier rejected completion.",
       "example": "evidence basis missing / critical question unresolved / success condition not cited."
     },
+    "MODEL_ERROR": {
+      "definition": "The supervisor model produced an unparseable or contract-invalid structured decision (e.g. non-JSON, missing required field, no basis refs), so no capability was dispatched.",
+      "example": "invoke_capability with empty basis refs rejected by decision_from_dict.",
+      "phase3e_primary": "SUPERVISOR_CONTRACT_FAILURE"
+    },
+    "INVALID_DECISIONS": {
+      "definition": "The supervisor produced decisions the deterministic validator rejected (e.g. incompatible input, unknown output type, duplicate no-progress call) so many times that the run ended with INVALID_DECISIONS and no backend dispatched.",
+      "example": "repeated pentest invoke citing an output type the capability does not produce.",
+      "phase3e_primary": "INVALID_DECISION_EXHAUSTION"
+    },
+    "ENVIRONMENT_FAILURE": {
+      "definition": "Runtime/dependency/environment prerequisite missing (docker daemon, backend venv, services, credentials).",
+      "example": "FuzzingBrain mongodb/redis down; Kong JDK/Ghidra path missing.",
+      "phase3e_primary": "RUNTIME_UNAVAILABLE"
+    },
+    "BACKEND_START_FAILURE": {
+      "definition": "Backend healthcheck/prepare succeeded or was reached but the backend process failed to start.",
+      "example": "subprocess create failed; adapter healthcheck blocked startup.",
+      "phase3e_primary": "BACKEND_PROCESS_FAILURE"
+    },
+    "BACKEND_TOOL_FAILURE": {
+      "definition": "Backend started and ran tools, but a backend-internal tool/analysis failed without reaching the target conclusion.",
+      "example": "Ghidra analysis error; fuzzer build failure inside FuzzingBrain.",
+      "phase3e_primary": "BACKEND_SEMANTIC_FAILURE or TOOL_FAILURE"
+    },
+    "SEARCH_OR_REASONING_FAILURE": {
+      "definition": "Backend ran normally but the professional agent's search/reasoning did not reach the ground truth within budget.",
+      "example": "PentestGPT enumerated but did not find the exploit; agent explored a wrong path.",
+      "phase3e_primary": "SEARCH_FAILURE"
+    },
     "GROUND_TRUTH_NOT_REACHED": {
       "definition": "Backend succeeded (or partially succeeded) but the external ground truth was not produced.",
-      "example": "no flag captured; expected crash not found; expected finding absent."
+      "example": "no flag captured; expected crash not found; expected finding absent.",
+      "phase3e_primary": "ORACLE_NOT_SATISFIED"
     },
     "FALSE_SUCCESS": {
       "definition": "Hunter reported global COMPLETE but the external ground truth was NOT satisfied.",
@@ -58,7 +129,9 @@
   },
   "mapping_rules": {
     "primary": "choose exactly one category per run",
+    "phase3e_primary": "Phase 3E reports use the Phase 3E primary name; v1.0 names remain valid aliases",
     "contributing": "additional categories may be listed as contributing_factors",
-    "professional_failure": "a professional backend failing to solve a case is SEARCH_OR_REASONING_FAILURE, BUDGET_EXHAUSTED, or TIMEOUT, never automatically a Hunter integration failure"
+    "professional_failure": "a professional backend failing to solve a case is SEARCH_FAILURE, BUDGET_EXHAUSTED, TIMEOUT, or ORACLE_NOT_SATISFIED, never automatically a Hunter integration failure",
+    "availability_separation": "RUNTIME_UNAVAILABLE / UNSUPPORTED_EVIDENCE / BENCHMARK_MISSING are reported separately and excluded from the model-capability denominator"
   }
 }
