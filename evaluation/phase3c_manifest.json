@@ -4,7 +4,7 @@
   "parent": "phase3b_2026-08-31 (commit 27d6101)",
   "commits": {
     "hunter_agent_parent": "27d6101 (phase3b)",
-    "hunter_agent_phase3c": "working tree at eval time: hunter_brain/completion_truth.py + verifier/orchestrator gate (see HUNTER_COMPLETION_VERIFICATION_REPORT.md)",
+    "hunter_agent_phase3c": "1c32588 (phase3c: ground-truth completion verification closure)",
     "pentestgpt_core": "unchanged submodule pointer",
     "trudi": "10559b1",
     "kong": "8c4ee4b",
