@@ -1,0 +1,49 @@
+{
+  "evaluation_id": "phase3d_c_2026-08-31",
+  "total_runs": 2,
+  "availability": {
+    "dfir_runtime_available": 2,
+    "dfir_runtime_total": 2,
+    "dfir_runtime_rate": 100.0,
+    "runtime_bootstrap_reproducible": true,
+    "evidence_available": 2,
+    "evidence_sha_verified": 2,
+    "evidence_type_supported": true
+  },
+  "capability": {
+    "eligible_denominator": 2,
+    "backend_execution_success": 2,
+    "semantic_adequate": 2,
+    "task_goal_verified": 2,
+    "task_goal_verified_rate": 100.0,
+    "false_success": 0
+  },
+  "per_run": [
+    {
+      "run_id": "phase3dc-dfir_trudi_full_eicar-20260901-092042-26c30",
+      "orchestration_status": "complete",
+      "completion_verdict": "verified",
+      "completion_reason": "goal_evidence_satisfied",
+      "classification": {
+        "category": "VERIFIED_SUCCESS",
+        "verdict": "verified",
+        "reason": "goal_evidence_satisfied"
+      },
+      "elapsed_seconds": 562.82
+    },
+    {
+      "run_id": "phase3dc-dfir_trudi_full_eicar-20260901-093144-f3cff",
+      "orchestration_status": "complete",
+      "completion_verdict": "verified",
+      "completion_reason": "goal_evidence_satisfied",
+      "classification": {
+        "category": "VERIFIED_SUCCESS",
+        "verdict": "verified",
+        "reason": "goal_evidence_satisfied"
+      },
+      "elapsed_seconds": 449.97
+    }
+  ],
+  "unavailable_error_code_distribution": {},
+  "note": "RUNTIME_UNAVAILABLE / UNSUPPORTED_EVIDENCE / BENCHMARK_MISSING are reported separately and excluded from the model-capability denominator."
+}

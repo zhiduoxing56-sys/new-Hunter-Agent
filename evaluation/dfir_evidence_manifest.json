@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "evaluation_id": "phase3d_c_2026-08-31",
+  "note": "Real public DFIR evidence acquisition manifest. Large/sensitive corpora are never committed to Git; an acquisition script downloads to .runtime/eval-artifacts/dfir/ and verifies the SHA-256 before use. Mismatch aborts.",
+  "why_not_cfreds": "CFReDS disk/memory images (E01/RM, 7.4G) do not match the currently-qualified TRUDI Full toolset (hash/strings/YARA/chainsaw EVTX only; Volatility, Plaso, Sleuth Kit, EZ Tools, tshark are not qualified in this deployment). EICAR is a small, real, public, legally-redistributable artifact that the qualified single-file toolset can analyze deterministically.",
+  "corpus": {
+    "name": "EICAR Standard Anti-Virus Test File",
+    "source_url": "https://www.eicar.org/download/eicar.com.txt",
+    "license_or_redistribution": "Published by EICAR/AMTSO as a standard test signature for antivirus products; freely redistributable for testing/validation. This is a real public artifact, not a self-made ground truth.",
+    "expected_size": 68,
+    "sha256": "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f",
+    "target_relative": ".runtime/eval-artifacts/dfir/eicar.com",
+    "intake_normalized_type": "evidence_file",
+    "toolset_support": "hash (sha256 + verify), strings (extract/grep/identify), yara (scan file/strings), read_output"
+  }
+}

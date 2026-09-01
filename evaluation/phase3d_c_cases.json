@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0",
+  "evaluation_id": "phase3d_c_2026-08-31",
+  "parent": "phase3d-b (commit f5524ab / manifest 9122a3e)",
+  "note": "Phase 3D-C DFIR runtime/environment & real-evidence availability closure. This phase measures runtime availability and honest completion truth for TRUDI Full through the default Hunter entry; it is not a capability-optimization phase. Evidence is the real public EICAR artifact (see evaluation/dfir_evidence_manifest.json).",
+  "cases": [
+    {
+      "case_id": "dfir-trudi-full-eicar",
+      "domain": "dfir",
+      "budget_profile": "phase3d_c_trudi_full_1800s",
+      "budget_seconds": 1800,
+      "trudi_mode": "full",
+      "input": {
+        "kind": "file",
+        "path": ".runtime/eval-artifacts/dfir/eicar.com",
+        "sha256": "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f",
+        "source": "https://www.eicar.org/download/eicar.com.txt (EICAR Standard Anti-Virus Test File)",
+        "size": 68
+      },
+      "ground_truth": {
+        "type": "evidence_analysis",
+        "expected": null,
+        "note": "No forced verdict. TRUDI Full must start and produce an auditable AgentResult + completion verification; a benign/evidence-insufficient conclusion is a valid honest outcome (PARTIAL/NOT_VERIFIED allowed)."
+      }
+    }
+  ],
+  "runtime_contract": {
+    "node_pinned": "22.23.2",
+    "claude_pinned": "2.1.251",
+    "key_sources": ["HUNTER_TRUDI_DEEPSEEK_API_KEY", "DEEPSEEK_API_KEY", "kong config.db custom_api_key"],
+    "no_lite_fallback": true,
+    "full_healthcheck_codes": {
+      "TRUDI_FULL_RUNTIME": "runtime binary missing",
+      "TRUDI_NODE_RUNTIME": "Node < 22",
+      "TRUDI_CLAUDE_CODE": "Claude Code runtime broken",
+      "TRUDI_REASONING_UNAVAILABLE": "DeepSeek key missing",
+      "TRUDI_FULL_SHA256": "Layer-1 SHA missing"
+    }
+  }
+}
