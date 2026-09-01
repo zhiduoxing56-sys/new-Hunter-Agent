@@ -5,6 +5,7 @@
   "commits": {
     "hunter_agent_parent": "27d6101 (phase3b)",
     "hunter_agent_phase3c": "1c32588 (phase3c: ground-truth completion verification closure)",
+    "hunter_agent_phase3da": "c22a617 (phase3d-a: supervisor decision contract ingress & bounded retry)",
     "pentestgpt_core": "unchanged submodule pointer",
     "trudi": "10559b1",
     "kong": "8c4ee4b",
