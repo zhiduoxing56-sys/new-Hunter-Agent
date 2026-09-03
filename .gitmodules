@@ -4,7 +4,7 @@
 	branch = main
 [submodule "third_party/kong"]
 	path = third_party/kong
-	url = https://github.com/amruth-sn/kong.git
+	url = https://github.com/zhiduoxing56-sys/kong.git
 [submodule "third_party/trudi"]
 	path = third_party/trudi
 	url = https://github.com/nebulae/trudi.git
